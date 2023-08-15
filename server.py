@@ -1,33 +1,21 @@
 from flask import Flask, jsonify, request
-import snscrape.modules.twitter as sntwitter
 import pandas as pd
 import requests
+from dbConnection import db_client
+from functions import get_subreddit_posts
 
 app = Flask(__name__)
+app.config['DEBUG'] = True
 
-@app.route('/tweets', methods=['GET'])
-def get_tweets():
-    # Obtener el tema específico de la consulta
-    topic = request.args.get('topic')
-    limit = request.args.get('limit')
-    # Realizar la búsqueda de tweets
-    tweets = []
-    for i,tweet in enumerate(sntwitter.TwitterSearchScraper(f'"{topic}" lang:es').get_items()):
-        if i>limit:
-            break
-        # Verificar si el tweet es promocionado y omitirlo
-        tweets.append({
-            'id': tweet.id,
-            'content': tweet.rawContent,
-            'user': {
-                'id': tweet.user.id,
-                'username': tweet.user.username
-            }
-        })
-    print(f'Found {len(tweets)} tweets')
-    print(tweets)
-    return jsonify(tweets)
+@app.route('/subreddit', methods=['GET'])
+async def get_subreddit():
+    start_date_str = '01-01-20 00:00:00'
+    query = "ChatGpt"
+    posts_df, comments_df = await get_subreddit_posts(query, start_date_str)
+    posts_df = posts_df.to_json(orient='records')
+    comments_df = comments_df.to_json(orient='records')
 
+    return jsonify(posts_df, comments_df)
 #TODO Implementar el endpoint para obtener los tweets de un usuario
 #TODO Guardar los tweets en una base de datos
 #TODO Implementar el endpoint para obtener los tweets de un usuario desde la base de datos
@@ -48,9 +36,12 @@ def get_reddit():
     timeframe = request.args.get('timeframe', default='month')
 
     try:
+        db = db_client().reddit
         base_url = f'https://www.reddit.com/r/{subreddit}/{listing}.json?limit={limit}&t={timeframe}'
         response = requests.get(base_url, headers={'User-agent': 'yourbot'})
         data = response.json()
+        print(data)
+        db.data.insert_many(data['data']['children'])
         df = get_results(data)
         print(df)
         return jsonify(data)

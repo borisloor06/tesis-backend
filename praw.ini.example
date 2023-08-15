@@ -1,0 +1,7 @@
+[bot1]
+client_id=<your_client_id>
+client_secret=<your_client_secret>
+username=<your_username>
+password=<your_password>
+user_agent=<your_user_agent> # e.g. "bot1 by /u/username"
+refresh_token=<your_refresh_token> #copy the token here after executing the script refreshToken.py
