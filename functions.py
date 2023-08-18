@@ -17,29 +17,33 @@ async def get_subreddit_posts(subreddit_name, start_date_str):
     comments = []
     posts = []
     i = 0
+    comment_columns = ['body', 'score', 'id', 'subreddit', 'created', 'subreddit_id','author']
+    post_columns = ['title', 'score', 'id', 'url', 'num_comments', 'selftext', 'created', 'created_utc', 'author']
     async for post in subreddits:
         date = post.created_utc
         submission = await reddit.submission(id=post.id, fetch=True)
         await submission.comments.replace_more(limit=0)
         for comment in submission.comments.list():
-            columns = ['body', 'score', 'id', 'subreddit', 'created', 'author']
             author = 'sin autor'
             try:
                 author = comment.author.name
             except AttributeError:
                 continue
-            data = [comment.body, comment.score, comment.id, comment.subreddit.display_name, comment.created, author]
+            data = [comment.body, comment.score, comment.id, comment.subreddit.display_name, comment.created, comment._submission.id, author]
             comments.append(data)
-            comment_see = dict(zip(columns, data))
-            print(comment_see)
+            comment_see = dict(zip(comment_columns, data))
             if(db.reddit_comments.find_one({'id': comment_see['id']}) is None):
                 db.reddit_comments.insert_one(comment_see)
+            else:
+                db.reddit_comments.update_one({'id': comment_see['id']}, {'$set': comment_see})
             if i == 0:
                 print(vars(comment))
+                print('-------------------')
+                print(vars(submission))
+                print('-------------------')
                 print(vars(post))
                 i += 1
         if date > start_date:
-            columns = ['title', 'score', 'id', 'url', 'num_comments', 'selftext', 'created', 'created_utc', 'author']
             author = 'sin autor'
             try:
                 author = comment.author.name
@@ -47,13 +51,15 @@ async def get_subreddit_posts(subreddit_name, start_date_str):
                 continue
             data = [post.title, post.score, post.id, post.url, post.num_comments, post.selftext, post.created, post.created_utc, author]
             posts.append(data)
-            post_see = dict(zip(columns, data))
-            print(post_see)
+            post_see = dict(zip(post_columns, data))
             if(db.reddit_posts.find_one({'id': post_see['id']}) is None):
-                db.reddit_posts.insert_one(post_see)
-    all_posts = pd.DataFrame(posts, columns=['title', 'score', 'id', 'url', 'num_comments', 'selftext', 'created', 'created_utc', 'author'])
-    all_posts['created_utc'] = pd.to_datetime(all_posts['Created On'], unit='s')
-    df_comments = pd.DataFrame(comments, columns=['body', 'score', 'id', 'created',  'author'])
+                try:
+                    db.reddit_posts.insert_one(post_see)
+                except Exception as e:
+                    print(e)
+                    continue
+    all_posts = pd.DataFrame(posts, columns=post_columns)
+    df_comments = pd.DataFrame(comments, columns=comment_columns)
 
     return all_posts, df_comments
 
