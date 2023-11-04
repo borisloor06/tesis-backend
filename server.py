@@ -1,18 +1,30 @@
 from flask import Flask, jsonify, request
 import pandas as pd
 import requests
-from dbConnection import db_client
-from functions import get_subreddit_posts
+from src.dbConnection.dbConnection import db_client
+from src.saveDbDataFunctions.functions import get_subreddit_posts
+from src.getDbDataFunctions.getMongoData import joinPostWithComments
+from src.cleanDataFunctions.cleanData import clean_reddit_data
+from src.nlpAnalizeFunctions.analyzeData import analize_data
 
-app = Flask(__name__)
-app.config['DEBUG'] = True
+def create_app():
+    app = Flask(__name__)
+    app.config['DEBUG'] = True
+    # Define the db_client instance as a singleton
+    if not hasattr(app, 'db_client'):
+        app.db = db_client()
+    return app
+
+app = create_app()
 
 @app.route('/subreddit', methods=['GET'])
 async def get_subreddit():
     start_date_str = '01-01-20 00:00:00'
-    query = "ChatGpt"
-    posts_df, comments_df = await get_subreddit_posts(query, start_date_str)
-    posts_df = posts_df.to_json(orient='records')
+    query = request.args.get('name', default='ChatGpt')
+    query_comments_collection = f'{query}_comments'
+    query_posts_collection = f'{query}_posts'
+    posts_df, comments_df = await get_subreddit_posts(query, start_date_str, query_comments_collection, query_posts_collection)
+    posts_df = posts_df.to_json(orient='records', date_format='iso')
     comments_df = comments_df.to_json(orient='records')
 
     return jsonify(posts_df, comments_df)
@@ -59,6 +71,24 @@ def get_results(r):
     df = pd.DataFrame.from_dict(myDict, orient='index')
     return df
 
+@app.route('/gpt_data', methods=['GET'])
+async def test_get_data():
+    data = await joinPostWithComments(app)
+    columns = data.columns
+    for column in columns:
+        data = clean_reddit_data(data, column)
+    print("-------------------columns-------------------")
+    print(columns)
+
+    accuracy, report = analize_data(data)
+    print("-------------------accuracy-------------------")
+    print(accuracy)
+    print("-------------------report-------------------")
+    print(report)
+    print("-------------------data-------------------")
+    print(data.head(5))
+    data = data.to_json(orient='records')
+    return jsonify(data)
 
 if __name__ == '__main__':
-    app.run()
+    app.run(port=80)

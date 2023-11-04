@@ -34,4 +34,8 @@ python server.py
 ### get subreddit con appi
 
 > localhost:5000/subreddit
+>
+> localhost:5000/subreddit?name=AskReddit
+
+- name -> Nombre del subreddit a consultar by default is ChatGPT
 get all subreddit of r/ChatGPT reddit
