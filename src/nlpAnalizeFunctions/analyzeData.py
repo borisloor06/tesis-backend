@@ -13,6 +13,20 @@ import nltk
 nltk.download('stopwords')
 nltk.download('punkt')
 
+from transformers import pipeline
+
+def analisis_sentimientos(dataframe, columna):
+    nlp = pipeline("sentiment-analysis")
+    resultados = dataframe[columna].apply(lambda x: nlp(x))
+
+    for i, sentimiento in enumerate(resultados):
+        for categoria, score in sentimiento:
+            dataframe.at[i, f'{columna}_{categoria}'] = score
+    print(dataframe.head(5))
+    return dataframe
+
+
+
 def analyze_sentiments(data):
     data['sentiment'] = data['comments_body'].apply(lambda x: analyze_sentiment(x))
     return data
