@@ -16,13 +16,21 @@ nltk.download('punkt')
 from transformers import pipeline
 
 def analisis_sentimientos(dataframe, columna):
-    nlp = pipeline("sentiment-analysis")
-    resultados = dataframe[columna].apply(lambda x: nlp(x))
+     # Create a pipeline for sentiment analysis using the SamLowe/roberta-base-go_emotions model.
+    nlp = pipeline("sentiment-analysis", model="SamLowe/roberta-base-go_emotions")
+    
+    # Truncate the input sequences to 512 tokens
+    truncated_resultados = []
+    for resultado in dataframe[columna].apply(lambda x: x[:512]):
+        truncated_resultado = nlp(resultado)
+        truncated_resultados.append(truncated_resultado)
 
-    for i, sentimiento in enumerate(resultados):
+    # Add the sentiment scores as new columns to the dataframe.
+    for i, sentimiento in enumerate(truncated_resultados):
         for categoria, score in sentimiento:
-            dataframe.at[i, f'{columna}_{categoria}'] = score
-    print(dataframe.head(5))
+            dataframe.at[i, f"{columna}_{categoria}"] = score
+
+    # Return the dataframe with the sentiment scores added.
     return dataframe
 
 

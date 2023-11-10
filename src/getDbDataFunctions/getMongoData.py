@@ -1,11 +1,14 @@
 import pandas as pd
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 
+@lru_cache()
 async def getComments(app):
   cursor = app.db.reddit_comments.find({}, {'_id': 0})
   return list(cursor)
 
+@lru_cache()
 async def getPost(app):
   cursor = app.db.reddit_posts.find({}, {'_id': 0})
   return list(cursor)
@@ -29,7 +32,7 @@ async def joinPostWithComments(app):
     )
     return result_df
 
-
+@lru_cache()
 async def getCommentsAndPostConcurrent(app):
     with ThreadPoolExecutor() as executor:
         comments_future = executor.submit(getComments, app)

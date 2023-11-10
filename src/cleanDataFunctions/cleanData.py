@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 def clean_reddit_data(dataframe, column):
     # Drop duplicates if necessary
     df = dataframe.drop_duplicates()
@@ -10,7 +12,7 @@ def clean_reddit_data(dataframe, column):
 
     return df
 
-
+@lru_cache()
 def clean_text(text):
     import re
     # validar si la columna es de tipo string
@@ -23,6 +25,7 @@ def clean_text(text):
 
     return text
 
+@lru_cache()
 def clean_data(text):
     if not validar_str(text):
         return text
@@ -31,5 +34,6 @@ def clean_data(text):
     except Exception as e:
         return "?"
 
+@lru_cache()
 def validar_str(text):
     return isinstance(text, str)
