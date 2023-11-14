@@ -6,6 +6,7 @@ from src.saveDbDataFunctions.functions import get_subreddit_posts
 from src.getDbDataFunctions.getMongoData import joinPostWithComments
 from src.cleanDataFunctions.cleanData import clean_reddit_data
 from src.nlpAnalizeFunctions.analyzeData import analize_data, analisis_sentimientos
+from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
 
 def create_app():
     app = Flask(__name__)
@@ -79,20 +80,26 @@ async def test_get_data():
         data = clean_reddit_data(data, column)
     print("-------------------columns-------------------")
     print(columns)
-    data = analisis_sentimientos(data, 'comments_body')
-    print("-------------------data-------------------")
-    print(data.head(5))
+    sentiment_analyzer = SentimentAnalyzer(max_threads=4)  # You can adjust the number of threads as needed
+    data = sentiment_analyzer.analyze_sentiments(data, text_column='comments_body')
+    # data = analisis_sentimientos(data, 'comments_body')
+    # print("-------------------data-------------------")
+    # print(data.head(5))
     # make a graph with the f'{columna}_{categoria}' of sentiment analisis
     # plt.figure(figsize=(12,6))
     # sns.barplot(x='category', y='sentiment', data=data)
     # plt.show()
-    accuracy, report = analize_data(data)
-    print("-------------------accuracy-------------------")
-    print(accuracy)
-    print("-------------------report-------------------")
-    print(report)
+    # # accuracy, report = analize_data(data)
+    # print("-------------------accuracy-------------------")
+    # print(accuracy)
+    # print("-------------------report-------------------")
+    # print(report)
     print("-------------------data-------------------")
     print(data.head(5))
+    # save data to file
+    data.to_csv('data.csv', index=False, encoding='utf-8')
+    # return ok
+    return jsonify({'message': 'ok'})
     data = data.to_json(orient='records')
     return jsonify(data)
 

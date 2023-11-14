@@ -13,24 +13,40 @@ import nltk
 nltk.download('stopwords')
 nltk.download('punkt')
 
-from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+def analisis_sentimientos(dataframe, column):
+    # Load the tokenizer and model for sentiment analysis
+    tokenizer = AutoTokenizer.from_pretrained("jkhan447/sentiment-model-sample-go-emotion")
+    model = AutoModelForSequenceClassification.from_pretrained("jkhan447/sentiment-model-sample-go-emotion")
 
-def analisis_sentimientos(dataframe, columna):
-     # Create a pipeline for sentiment analysis using the SamLowe/roberta-base-go_emotions model.
-    nlp = pipeline("sentiment-analysis", model="SamLowe/roberta-base-go_emotions")
-    
-    # Truncate the input sequences to 512 tokens
-    truncated_resultados = []
-    for resultado in dataframe[columna].apply(lambda x: x[:512]):
-        truncated_resultado = nlp(resultado)
-        truncated_resultados.append(truncated_resultado)
+    # Check if the specified column exists in the DataFrame
+    if column not in dataframe.columns:
+        print(f"Column '{column}' not found in the DataFrame.")
+        return dataframe
 
-    # Add the sentiment scores as new columns to the dataframe.
-    for i, sentimiento in enumerate(truncated_resultados):
-        for categoria, score in sentimiento:
-            dataframe.at[i, f"{columna}_{categoria}"] = score
+    # Initialize an empty list to store the results
+    sentiment_results = []
 
-    # Return the dataframe with the sentiment scores added.
+    # Loop through the rows in the specified column
+    for text in dataframe[column]:
+        try:
+            # Tokenize the text and get the sentiment scores
+            inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+            outputs = model(**inputs)
+            sentiment_scores = outputs.logits[0].tolist()
+
+            # Add the sentiment scores as a dictionary to the results list
+            sentiment_result = {label: score for label, score in enumerate(sentiment_scores)}
+            sentiment_results.append(sentiment_result)
+        except Exception as e:
+            print(f"Error analyzing sentiment for text: {text}. Error: {str(e)}")
+
+    # Convert the list of sentiment results into a DataFrame
+    sentiment_df = pd.DataFrame(sentiment_results)
+
+    # Concatenate the original DataFrame with the sentiment results DataFrame
+    dataframe = pd.concat([dataframe, sentiment_df], axis=1)
+
     return dataframe
 
 

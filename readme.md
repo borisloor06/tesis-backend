@@ -19,6 +19,9 @@ Una vez completado los pasos anteriores puedes ejecutar el servidor
 python server.py
 ```
 
+```bash
+flask --app server.py --debug run 
+```
 ## Lista Endpoints funcionales
 
 ### get subreddit sin api
