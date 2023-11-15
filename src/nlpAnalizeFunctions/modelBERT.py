@@ -25,7 +25,7 @@ class SentimentAnalyzer:
         text_list = dataframe[text_column].tolist()
         with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
             sentiment_scores = list(executor.map(self.analyze_sentiment, text_list))
-        sentiment_df = pd.DataFrame(sentiment_scores, columns=self.sentiment_columns)
+        sentiment_df = pd.DataFrame(sentiment_scores, columns=dataframe.columns.tolist().extend(self.sentiment_columns))
         return sentiment_df
 
     def analyze_sentiment(self, text):
