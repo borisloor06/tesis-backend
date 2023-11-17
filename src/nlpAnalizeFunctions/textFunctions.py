@@ -127,7 +127,14 @@ class TopicExtraction:
             print(f'The top {n} words for topic #{index}')
             print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
         self.dataframe["topic"] = topics.argmax(axis=1)
-
+        self.dataframe["topic_string"] = self.dataframe["topic"].map({
+            0: 'Chat and Humor',
+            1: 'Casual Conversations and Humor',
+            2: 'Superhero and Fantasy',
+            3: 'Chat and Humor',
+            4: 'AI and Technology'
+            # Add more mappings if you have additional topics
+        })
         return self.dataframe
 
 
@@ -140,5 +147,9 @@ class SentimentAnalysis:
         sid = SentimentIntensityAnalyzer()
         self.dataframe["sentiment_score"] = self.dataframe[self.text_column].apply(
             lambda x: sid.polarity_scores(x)["compound"]
+        )
+        # Categorize sentiment scores into labels
+        self.dataframe["sentiment_label"] = self.dataframe["sentiment_score"].apply(
+            lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
         return self.dataframe
