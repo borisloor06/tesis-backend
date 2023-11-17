@@ -3,7 +3,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 import pandas as pd
 from nltk.sentiment import SentimentIntensityAnalyzer
-
+import nltk
+nltk.download('vader_lexicon')
 
 class TemporalAnalysis:
     def __init__(self, dataframe, time_column, subreddit_column):
@@ -19,14 +20,13 @@ class TemporalAnalysis:
                     pd.to_datetime(self.dataframe[self.time_column]).dt.to_period("M"),
                 ]
             )
-            .size()
-            .reset_index(name="monthly_post_count")
         )
+        temporal_data = pd.concat([dato for _, dato in temporal_data])
 
         # Utilizar pd.concat en lugar de pd.merge
         self.dataframe = pd.concat([
-            self.dataframe.set_index([self.subreddit_column, self.time_column]),
-            temporal_data.set_index([self.subreddit_column, self.time_column])
+            self.dataframe,
+            temporal_data
         ], axis=1, join='inner').reset_index()
 
         return self.dataframe
@@ -96,7 +96,7 @@ class KeywordIdentification:
 
         keywords = vectorizer.get_feature_names_out()
         keyword_counts = X.sum(axis=0).A1
-        keyword_df = pd.DataFrame({"keyword": keywords, "count": keyword_counts})
+        keyword_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
 
         self.dataframe = pd.merge(
             self.dataframe,
@@ -122,7 +122,10 @@ class TopicExtraction:
             n_components=5, random_state=42
         )  # Puedes ajustar el número de tópicos
         topics = lda.fit_transform(X)
-
+        n = 30  # Puedes ajustar el número de palabras por tópico
+        for index, topic in enumerate(lda.components_):
+            print(f'The top {n} words for topic #{index}')
+            print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
         self.dataframe["topic"] = topics.argmax(axis=1)
 
         return self.dataframe

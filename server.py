@@ -114,8 +114,11 @@ async def test_get_data():
     df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
     
     dataframes = [data, df_sentiment, df_time, df_author, df_relationship, df_keyword, df_topic, df_vader_sentiment]
-    df_analisis = pd.concat(dataframes, ignore_index=True, axis=1).loc[:, ~pd.concat(dataframes, ignore_index=True, axis=1).columns.duplicated()]
-    # df_analisis = data.drop(columns=['comments_body', 'posts_created', 'comments_subreddit', 'comments_author', 'comments_score', 'posts_title'])
+    df_analisis = pd.concat(dataframes, axis=1).drop_duplicates()
+    print("-------------------df_analisis-------------------")
+    print(df_analisis.head(5))
+    df_analisis = df_analisis.drop(columns=['comments_body', 'posts_created', 'comments_subreddit', 'comments_author', 'comments_score', 'posts_title', 'index', 'comments_subreddit_id'])
+    print(df_analisis.columns)
 
     saveToDB(df_analisis, app.db, analisis_collection)
     # save data to file
