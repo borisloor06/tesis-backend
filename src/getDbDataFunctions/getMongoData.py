@@ -3,16 +3,16 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
+columns_used=['comments_body', 'comments_id', 'posts_id', 'posts_created', 'comments_subreddit', 'comments_author', 'comments_score', 'posts_title']
 
 @lru_cache()
 async def getComments(db, comments_collection_name="reddit_comments"):
-    cursor = db[comments_collection_name].find({}, {"_id": 0}).batch_size(1000)
+    cursor = db[comments_collection_name].find({}, {"body": 1, "id": 1, "subreddit": 1, "author": 1, "score": 1, "subreddit_id": 1, "_id": 0})
     return list(cursor)
-
 
 @lru_cache()
 async def getPost(db, posts_collection_name="reddit_posts"):
-    cursor = db[posts_collection_name].find({}, {"_id": 0}).batch_size(1000)
+    cursor = db[posts_collection_name].find({}, {"id": 1, "created": 1, "title": 1, "_id": 0})
     return list(cursor)
 
 

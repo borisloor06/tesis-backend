@@ -23,15 +23,11 @@ class TemporalAnalysis:
             .reset_index(name="monthly_post_count")
         )
 
-        self.dataframe = pd.merge(
-            self.dataframe,
-            temporal_data,
-            on=[
-                self.subreddit_column,
-                pd.to_datetime(self.dataframe[self.time_column]).dt.to_period("M"),
-            ],
-            how="left",
-        )
+        # Utilizar pd.concat en lugar de pd.merge
+        self.dataframe = pd.concat([
+            self.dataframe.set_index([self.subreddit_column, self.time_column]),
+            temporal_data.set_index([self.subreddit_column, self.time_column])
+        ], axis=1, join='inner').reset_index()
 
         return self.dataframe
 

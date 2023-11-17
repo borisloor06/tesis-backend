@@ -8,6 +8,7 @@ from src.cleanDataFunctions.cleanData import clean_reddit_data
 from src.nlpAnalizeFunctions.analyzeData import analize_data, analisis_sentimientos
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
 from src.saveDbDataFunctions.saveAnalisis import saveToDB
+from src.nlpAnalizeFunctions.textFunctions import TemporalAnalysis, AuthorAnalysis, CommentPostRelationship, KeywordIdentification, TopicExtraction, SentimentAnalysis
 
 def create_app():
     app = Flask(__name__)
@@ -88,13 +89,35 @@ async def test_get_data():
         data = clean_reddit_data(data, column)
     print("-------------------columns-------------------")
     print(columns)
-    sentiment_analyzer = SentimentAnalyzer(max_threads=16)  # You can adjust the number of threads as needed
-    data = sentiment_analyzer.analyze_sentiments(data, text_column='comments_body')
-    # save data to db
 
+    data = data.head(5)
+
+    temporal_analyzer = TemporalAnalysis(data, 'posts_created', 'comments_subreddit')
+    df_time = temporal_analyzer.analyze_temporal_patterns()
+
+    sentiment_analyzer = SentimentAnalyzer(max_threads=16)  # You can adjust the number of threads as needed
+    df_sentiment = sentiment_analyzer.analyze_sentiments(data, text_column='comments_body')
+    # save data to db
     print("-------------------data-------------------")
     print(data.head(5))
-    saveToDB(data, app.db, analisis_collection)
+    print(df_sentiment.head(5))
+
+    author_analyzer = AuthorAnalysis(data, 'comments_author', 'comments_body')
+    df_author = author_analyzer.analyze_author_patterns()
+    comment_post_relationship_analyzer = CommentPostRelationship(data, 'comments_body', 'posts_title', 'comments_score')
+    df_relationship = comment_post_relationship_analyzer.analyze_relationships()
+    keyword_identifier = KeywordIdentification(data, 'comments_body')
+    df_keyword = keyword_identifier.identify_keywords()
+    topic_extractor = TopicExtraction(data, 'comments_body')
+    df_topic = topic_extractor.extract_topics()
+    sentiment_analyzer = SentimentAnalysis(data, 'comments_body')
+    df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
+    
+    dataframes = [data, df_sentiment, df_time, df_author, df_relationship, df_keyword, df_topic, df_vader_sentiment]
+    df_analisis = pd.concat(dataframes, ignore_index=True, axis=1).loc[:, ~pd.concat(dataframes, ignore_index=True, axis=1).columns.duplicated()]
+    # df_analisis = data.drop(columns=['comments_body', 'posts_created', 'comments_subreddit', 'comments_author', 'comments_score', 'posts_title'])
+
+    saveToDB(df_analisis, app.db, analisis_collection)
     # save data to file
     data.to_csv('data.csv', index=False, encoding='utf-8')
     return jsonify({'message': 'ok'})
