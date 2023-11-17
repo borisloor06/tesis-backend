@@ -3,19 +3,27 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
-@lru_cache()
-async def getComments(app):
-  cursor = app.db.reddit_comments.find({}, {'_id': 0})
-  return list(cursor)
 
 @lru_cache()
-async def getPost(app):
-  cursor = app.db.reddit_posts.find({}, {'_id': 0})
-  return list(cursor)
+async def getComments(db, comments_collection_name="reddit_comments"):
+    cursor = db[comments_collection_name].find({}, {"_id": 0}).batch_size(1000)
+    return list(cursor)
 
 
-async def joinPostWithComments(app):
-    data = await getCommentsAndPostConcurrent(app)
+@lru_cache()
+async def getPost(db, posts_collection_name="reddit_posts"):
+    cursor = db[posts_collection_name].find({}, {"_id": 0}).batch_size(1000)
+    return list(cursor)
+
+
+async def joinPostWithComments(
+    db, comments_collection_name="reddit_comments", posts_collection_name="reddit_posts"
+):
+    data = await getCommentsAndPostConcurrent(
+        db,
+        comments_collection_name,
+        posts_collection_name,
+    )
     print(data)
     comments, posts = await data[0], await data[1]
     comments = pd.DataFrame(comments)
@@ -32,11 +40,14 @@ async def joinPostWithComments(app):
     )
     return result_df
 
+
 @lru_cache()
-async def getCommentsAndPostConcurrent(app):
+async def getCommentsAndPostConcurrent(
+    db, comments_collection_name="reddit_comments", posts_collection_name="reddit_posts"
+):
     with ThreadPoolExecutor() as executor:
-        comments_future = executor.submit(getComments, app)
-        posts_future = executor.submit(getPost, app)
+        comments_future = executor.submit(getComments, db, comments_collection_name)
+        posts_future = executor.submit(getPost, db, posts_collection_name)
 
         comments = await asyncio.to_thread(comments_future.result)
         posts = await asyncio.to_thread(posts_future.result)

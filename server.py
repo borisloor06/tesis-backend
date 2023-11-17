@@ -75,23 +75,29 @@ def get_results(r):
 
 @app.route('/gpt_data', methods=['GET'])
 async def test_get_data():
-    data = await joinPostWithComments(app)
+    query = request.args.get('name', default='ChatGpt')
+    comments_collection = f'{query}_comments'
+    posts_collection = f'{query}_posts'
+    analisis_collection = f'{query}_analisis'
+    import time
+    start_time = time.time()
+    data = await joinPostWithComments(app.db, comments_collection, posts_collection)
+    print("--- %s seconds ---" % (time.time() - start_time))
     columns = data.columns
     for column in columns:
         data = clean_reddit_data(data, column)
     print("-------------------columns-------------------")
     print(columns)
-    data = data.head(5)
-    sentiment_analyzer = SentimentAnalyzer(max_threads=4)  # You can adjust the number of threads as needed
+    sentiment_analyzer = SentimentAnalyzer(max_threads=16)  # You can adjust the number of threads as needed
     data = sentiment_analyzer.analyze_sentiments(data, text_column='comments_body')
     # save data to db
-    saveToDB(data, app.db)
 
     print("-------------------data-------------------")
     print(data.head(5))
+    saveToDB(data, app.db, analisis_collection)
     # save data to file
-    return jsonify({'message': 'ok'})
     data.to_csv('data.csv', index=False, encoding='utf-8')
+    return jsonify({'message': 'ok'})
     # return ok
     data = data.to_json(orient='records')
     return jsonify(data)
