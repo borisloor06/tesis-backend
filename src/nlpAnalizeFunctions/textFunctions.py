@@ -27,7 +27,7 @@ class TemporalAnalysis:
         self.dataframe = pd.concat([
             self.dataframe,
             temporal_data
-        ], axis=1, join='inner').reset_index()
+        ], axis=1)
 
         return self.dataframe
 
@@ -42,7 +42,7 @@ class AuthorAnalysis:
         author_data = (
             self.dataframe.groupby(self.author_column)
             .agg({self.text_column: "count", "comments_score": "mean"})
-            .reset_index()
+            
         )
 
         author_data.columns = [
@@ -69,7 +69,7 @@ class CommentPostRelationship:
         grouped_data = (
             self.dataframe.groupby(self.post_column)
             .agg({self.comment_column: "count", self.score_column: "mean"})
-            .reset_index()
+            
         )
 
         grouped_data.columns = [
@@ -97,14 +97,12 @@ class KeywordIdentification:
         keywords = vectorizer.get_feature_names_out()
         keyword_counts = X.sum(axis=0).A1
         keyword_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
-
-        self.dataframe = pd.merge(
+        print(keyword_df)
+        self.dataframe = pd.concat([
             self.dataframe,
-            keyword_df,
-            left_on=self.text_column,
-            right_on="keyword",
-            how="left",
-        )
+            keyword_df
+        ], axis=1)
+        print(self.dataframe)
 
         return self.dataframe
 
