@@ -90,7 +90,7 @@ async def test_get_data():
     print("-------------------columns-------------------")
     print(columns)
 
-    data = data.head(5)
+    # data = data.head(5)
 
     temporal_analyzer = TemporalAnalysis(data, 'posts_created', 'comments_subreddit')
     df_time = temporal_analyzer.analyze_temporal_patterns()
@@ -106,18 +106,19 @@ async def test_get_data():
     df_author = author_analyzer.analyze_author_patterns()
     comment_post_relationship_analyzer = CommentPostRelationship(data, 'comments_body', 'posts_title', 'comments_score')
     df_relationship = comment_post_relationship_analyzer.analyze_relationships()
-    keyword_identifier = KeywordIdentification(data, 'comments_body')
-    df_keyword = keyword_identifier.identify_keywords()
+    # keyword_identifier = KeywordIdentification(data, 'comments_body')
+    # df_keyword = keyword_identifier.identify_keywords()
     topic_extractor = TopicExtraction(data, 'comments_body')
     df_topic = topic_extractor.extract_topics()
     sentiment_analyzer = SentimentAnalysis(data, 'comments_body')
     df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
-    
-    dataframes = [data, df_sentiment, df_time, df_author, df_relationship, df_keyword, df_topic, df_vader_sentiment]
-    df_analisis = pd.concat(dataframes, axis=1).drop_duplicates()
+
+    dataframes = [data, df_sentiment, df_time, df_author, df_relationship, df_topic, df_vader_sentiment]
+    df_analisis = pd.concat(dataframes, axis=1)
     print("-------------------df_analisis-------------------")
     print(df_analisis.head(5))
-    df_analisis = df_analisis.drop(columns=['comments_body', 'posts_created', 'comments_subreddit', 'comments_author', 'comments_score', 'posts_title', 'index', 'comments_subreddit_id'])
+    print(df_analisis.columns)
+    df_analisis = df_analisis.drop(columns=['comments_body', 'posts_created', 'comments_subreddit', 'comments_author', 'comments_score', 'posts_title', 'comments_subreddit_id'])
     print(df_analisis.columns)
 
     saveToDB(df_analisis, app.db, analisis_collection)

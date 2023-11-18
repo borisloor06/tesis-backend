@@ -42,13 +42,13 @@ class AuthorAnalysis:
         author_data = (
             self.dataframe.groupby(self.author_column)
             .agg({self.text_column: "count", "comments_score": "mean"})
-            
+            .reset_index()
         )
 
         author_data.columns = [
             self.author_column,
-            "comment_count",
-            "average_comment_score",
+            "author_comment_count",
+            "average_author_comment_score",
         ]
 
         self.dataframe = pd.merge(
@@ -69,13 +69,13 @@ class CommentPostRelationship:
         grouped_data = (
             self.dataframe.groupby(self.post_column)
             .agg({self.comment_column: "count", self.score_column: "mean"})
-            
+            .reset_index()
         )
 
         grouped_data.columns = [
             self.post_column,
-            "comment_count",
-            "average_comment_score",
+            "comment_post_count",
+            "average_comment_post_score",
         ]
 
         self.dataframe = pd.merge(
@@ -97,12 +97,10 @@ class KeywordIdentification:
         keywords = vectorizer.get_feature_names_out()
         keyword_counts = X.sum(axis=0).A1
         keyword_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
-        print(keyword_df)
         self.dataframe = pd.concat([
             self.dataframe,
             keyword_df
-        ], axis=1)
-        print(self.dataframe)
+        ], axis=1, )
 
         return self.dataframe
 
@@ -120,10 +118,11 @@ class TopicExtraction:
             n_components=5, random_state=42
         )  # Puedes ajustar el número de tópicos
         topics = lda.fit_transform(X)
-        n = 30  # Puedes ajustar el número de palabras por tópico
-        for index, topic in enumerate(lda.components_):
-            print(f'The top {n} words for topic #{index}')
-            print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
+        # identify keywords for each topic
+        # n = 30  # Puedes ajustar el número de palabras por tópico
+        # for index, topic in enumerate(lda.components_):
+        #     print(f'The top {n} words for topic #{index}')
+        #     print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
         self.dataframe["topic"] = topics.argmax(axis=1)
         self.dataframe["topic_string"] = self.dataframe["topic"].map({
             0: 'Chat and Humor',

@@ -24,7 +24,6 @@ async def joinPostWithComments(
         comments_collection_name,
         posts_collection_name,
     )
-    print(data)
     comments, posts = await data[0], await data[1]
     comments = pd.DataFrame(comments)
     posts = pd.DataFrame(posts)
