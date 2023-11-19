@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from src.dbConnection.dbConnection import db_client
 from src.saveDbDataFunctions.functions import get_subreddit_posts
-from src.getDbDataFunctions.getMongoData import joinPostWithComments
+from src.getDbDataFunctions.getMongoData import joinPostWithComments, getAnalisis
 from src.cleanDataFunctions.cleanData import clean_reddit_data
 from src.nlpAnalizeFunctions.analyzeData import analize_data, analisis_sentimientos
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -128,6 +128,21 @@ async def test_get_data():
     # return ok
     data = data.to_json(orient='records')
     return jsonify(data)
+
+@app.route('/analisis', methods=['GET'])
+async def get_analisis_data():
+    query = request.args.get('name', default='ChatGpt')
+    analisis_collection = f'{query}_analisis'
+    comments_collection = f'{query}_comments'
+    posts_collection = f'{query}_posts'
+    analisis = await getAnalisis(app.db, analisis_collection);
+    data = await joinPostWithComments(app.db, comments_collection, posts_collection)
+    analisis = pd.DataFrame(analisis)
+    data_and_analisis = pd.merge(data, analisis, on=['comments_id', 'posts_id'], how='left')
+    data_and_analisis = data_and_analisis.to_json(orient='records')
+    return jsonify(data_and_analisis)
+
+
 
 if __name__ == '__main__':
     app.run(port=80)

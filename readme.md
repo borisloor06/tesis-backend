@@ -42,3 +42,11 @@ flask --app server.py --debug run
 
 - name -> Nombre del subreddit a consultar by default is ChatGPT
 get all subreddit of r/ChatGPT reddit
+
+
+### get analisis data and reddit data
+> localhost:5000/analisis
+>
+> localhost:5000/analisis?name=ChatGpt
+
+- name -> Nombre del subreddit a consultar by default is ChatGPT
