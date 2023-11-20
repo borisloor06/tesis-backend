@@ -1,7 +1,6 @@
 import pandas as pd
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 
 columns_used = [
     "comments_body",
@@ -15,7 +14,6 @@ columns_used = [
 ]
 
 
-@lru_cache()
 async def getComments(db, comments_collection_name="reddit_comments"):
     cursor = db[comments_collection_name].find(
         {},
@@ -32,7 +30,6 @@ async def getComments(db, comments_collection_name="reddit_comments"):
     return list(cursor)
 
 
-@lru_cache()
 async def getPost(db, posts_collection_name="reddit_posts"):
     cursor = db[posts_collection_name].find(
         {}, {"id": 1, "created": 1, "title": 1, "_id": 0}
@@ -40,12 +37,10 @@ async def getPost(db, posts_collection_name="reddit_posts"):
     return list(cursor)
 
 
-@lru_cache()
 async def getAnalisis(db, posts_collection_name="ChatGpt_analisis"):
     with ThreadPoolExecutor() as executor:
-        future = executor.submit(db[posts_collection_name].find, {}, {"_id": 0})
-        cursor = await asyncio.to_thread(future.result)
-    return cursor
+        result = await asyncio.to_thread(db[posts_collection_name].find, {}, {"_id": 0})
+    return result
 
 async def joinPostWithComments(
     db, comments_collection_name="reddit_comments", posts_collection_name="reddit_posts"
@@ -71,7 +66,6 @@ async def joinPostWithComments(
     return result_df
 
 
-@lru_cache()
 async def getCommentsAndPostConcurrent(
     db, comments_collection_name="reddit_comments", posts_collection_name="reddit_posts"
 ):
