@@ -83,35 +83,52 @@ async def test_get_data():
     import time
     start_time = time.time()
     data = await joinPostWithComments(app.db, comments_collection, posts_collection)
-    print("--- %s seconds ---" % (time.time() - start_time))
+    print("--- %s get data seconds ---" % (time.time() - start_time))
     columns = data.columns
+    
+    start_time = time.time()
     for column in columns:
         data = clean_reddit_data(data, column)
+    print("--- %s clean seconds ---" % (time.time() - start_time))
     print("-------------------columns-------------------")
     print(columns)
 
     # data = data.head(5)
-
+    start_time = time.time()
     temporal_analyzer = TemporalAnalysis(data, 'posts_created', 'comments_subreddit')
     df_time = temporal_analyzer.analyze_temporal_patterns()
+    print("--- %s temporal analisis seconds ---" % (time.time() - start_time))
+    start_time = time.time()
 
     sentiment_analyzer = SentimentAnalyzer(max_threads=16)  # You can adjust the number of threads as needed
     df_sentiment = sentiment_analyzer.analyze_sentiments(data, text_column='comments_body')
+    print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
     # save data to db
     print("-------------------data-------------------")
     print(data.head(5))
     print(df_sentiment.head(5))
+    start_time = time.time()
 
     author_analyzer = AuthorAnalysis(data, 'comments_author', 'comments_body')
     df_author = author_analyzer.analyze_author_patterns()
+    print("--- %s author analisis seconds ---" % (time.time() - start_time))
+    
+    start_time = time.time()
     comment_post_relationship_analyzer = CommentPostRelationship(data, 'comments_body', 'posts_title', 'comments_score')
     df_relationship = comment_post_relationship_analyzer.analyze_relationships()
+    print("--- %s relaciones analisis seconds ---" % (time.time() - start_time))
     # keyword_identifier = KeywordIdentification(data, 'comments_body')
     # df_keyword = keyword_identifier.identify_keywords()
+    start_time = time.time()
     topic_extractor = TopicExtraction(data, 'comments_body')
     df_topic = topic_extractor.extract_topics()
+    print("--- %s relaciones analisis seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
     sentiment_analyzer = SentimentAnalysis(data, 'comments_body')
-    df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
+    df_vader_sentiment = sentiment_analyzer.analyze_sentiments()    
+    print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
+
 
     dataframes = [data, df_sentiment, df_time, df_author, df_relationship, df_topic, df_vader_sentiment]
     df_analisis = pd.concat(dataframes, axis=1)
@@ -125,9 +142,7 @@ async def test_get_data():
     # save data to file
     data.to_csv('data.csv', index=False, encoding='utf-8')
     return jsonify({'message': 'ok'})
-    # return ok
-    data = data.to_json(orient='records')
-    return jsonify(data)
+
 
 @app.route('/analisis', methods=['GET'])
 async def get_analisis_data():
