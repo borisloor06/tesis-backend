@@ -58,3 +58,10 @@ def delete_stopwords(text):
 @lru_cache()
 def validar_str(text):
     return isinstance(text, str)
+
+
+def cleanData(data):
+    columns = data.columns
+    for column in columns:
+        data = clean_reddit_data(data, column)
+    return data
