@@ -76,3 +76,9 @@ async def getCommentsAndPostConcurrent(
         comments = await asyncio.to_thread(comments_future.result)
         posts = await asyncio.to_thread(posts_future.result)
     return [comments, posts]
+
+async def getDataUnclean(db, query):
+    comments_collection = f'{query}_comments'
+    posts_collection = f'{query}_posts'
+    data = await joinPostWithComments(db, comments_collection, posts_collection)
+    return data
