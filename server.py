@@ -3,12 +3,13 @@ import pandas as pd
 import requests
 from src.dbConnection.dbConnection import db_client
 from src.saveDbDataFunctions.functions import get_subreddit_posts
-from src.getDbDataFunctions.getMongoData import joinPostWithComments, getAnalisis
-from src.cleanDataFunctions.cleanData import clean_reddit_data
+from src.getDbDataFunctions.getMongoData import joinPostWithComments, getAnalisis, getDataUnclean
+from src.cleanDataFunctions.cleanData import clean_reddit_data, cleanData
 from src.nlpAnalizeFunctions.analyzeData import analize_data, analisis_sentimientos
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
 from src.saveDbDataFunctions.saveAnalisis import saveToDB
 from src.nlpAnalizeFunctions.textFunctions import TemporalAnalysis, AuthorAnalysis, CommentPostRelationship, KeywordIdentification, TopicExtraction, SentimentAnalysis
+import time
 
 def create_app():
     app = Flask(__name__)
@@ -31,13 +32,6 @@ async def get_subreddit():
     comments_df = comments_df.to_json(orient='records')
 
     return jsonify(posts_df, comments_df)
-#TODO Implementar el endpoint para obtener los tweets de un usuario
-#TODO Guardar los tweets en una base de datos
-#TODO Implementar el endpoint para obtener los tweets de un usuario desde la base de datos
-#TODO Relacionar una busqueda con un usuario
-#TODO Analizar los tweets de un usuario con la libreria de analisis de sentimientos
-#TODO Algoritmo de limpieza de datos que funcione siempre
-
 
 # @Param subreddit: Nombre del subreddit a consultar
 # @Param listing: Tipo de listado a consultar (controversial, best, hot, new, random, rising, top)
@@ -77,21 +71,16 @@ def get_results(r):
 @app.route('/gpt_data', methods=['GET'])
 async def test_get_data():
     query = request.args.get('name', default='ChatGpt')
-    comments_collection = f'{query}_comments'
-    posts_collection = f'{query}_posts'
     analisis_collection = f'{query}_analisis'
-    import time
+
     start_time = time.time()
-    data = await joinPostWithComments(app.db, comments_collection, posts_collection)
+    data = await getDataUnclean(app.db, query)
     print("--- %s get data seconds ---" % (time.time() - start_time))
-    columns = data.columns
     
     start_time = time.time()
-    for column in columns:
-        data = clean_reddit_data(data, column)
+    data = cleanData(data)
     print("--- %s clean seconds ---" % (time.time() - start_time))
-    print("-------------------columns-------------------")
-    print(columns)
+
 
     # data = data.head(5)
     start_time = time.time()
@@ -156,6 +145,77 @@ async def get_analisis_data():
     data_and_analisis = pd.merge(data, analisis, on=['comments_id', 'posts_id'], how='left')
     data_and_analisis = data_and_analisis.to_json(orient='records')
     return jsonify(data_and_analisis)
+
+@app.route('/sentiment_analisis', methods=['GET'])
+async def get_analisis_sentimientos():
+    query = request.args.get('name', default='ChatGpt')
+    start_time = time.time()
+    data = await getDataUnclean(app.db, query)
+
+    print("--- %s get data seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
+    data = cleanData(data)
+    print("--- %s clean seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
+    sentiment_analyzer = SentimentAnalysis(data, 'comments_body')
+    df_vader_sentiment = sentiment_analyzer.analyze_sentiments()    
+    print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
+    vader_sentiment = df_vader_sentiment.to_json(orient='records')
+    return jsonify(vader_sentiment)
+
+
+@app.route('/author_analisis', methods=['GET'])
+async def get_author_analisis():
+    query = request.args.get('name', default='ChatGpt')
+    data = await getDataUnclean(app.db, query)
+
+    data = cleanData(data)
+    author_analyzer = AuthorAnalysis(data, 'comments_author', 'comments_body')
+    df_author = author_analyzer.analyze_author_patterns()
+    author_analisis = df_author.to_json(orient='records')
+    return jsonify(author_analisis)
+
+@app.route('/temporal_analisis', methods=['GET'])
+async def get_temporal_analisis():
+    query = request.args.get('name', default='ChatGpt')
+    data = await getDataUnclean(app.db, query)
+    data = cleanData(data)
+    temporal_analyzer = TemporalAnalysis(data, 'posts_created', 'comments_subreddit')
+    df_time = temporal_analyzer.analyze_temporal_patterns()
+    temporal_analisis = df_time.to_json(orient='records')
+    return jsonify(temporal_analisis)
+
+@app.route('/comment_post_relationship_analisis', methods=['GET'])
+async def get_comment_post_relationship_analisis():
+    query = request.args.get('name', default='ChatGpt')
+    data = await getDataUnclean(app.db, query)
+    data = cleanData(data)
+    comment_post_relationship_analyzer = CommentPostRelationship(data, 'comments_body', 'posts_title', 'comments_score')
+    df_relationship = comment_post_relationship_analyzer.analyze_relationships()
+    comment_post_relationship_analisis = df_relationship.to_json(orient='records')
+    return jsonify(comment_post_relationship_analisis)
+
+@app.route('/keyword_identification', methods=['GET'])
+async def get_keyword_identification():
+    query = request.args.get('name', default='ChatGpt')
+    data = await getDataUnclean(app.db, query)
+    data = cleanData(data)
+    keyword_identifier = KeywordIdentification(data, 'comments_body')
+    df_keyword = keyword_identifier.identify_keywords()
+    keyword_identification = df_keyword.to_json(orient='records')
+    return jsonify(keyword_identification)
+
+@app.route('/topic_extraction', methods=['GET'])
+async def get_topic_extraction():
+    query = request.args.get('name', default='ChatGpt')
+    data = await getDataUnclean(app.db, query)
+    data = cleanData(data)
+    topic_extractor = TopicExtraction(data, 'comments_body')
+    df_topic = topic_extractor.extract_topics()
+    topic_extraction = df_topic.to_json(orient='records')
+    return jsonify(topic_extraction)
 
 
 
