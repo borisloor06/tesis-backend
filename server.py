@@ -143,6 +143,10 @@ async def get_analisis_data():
     data = await joinPostWithComments(app.db, comments_collection, posts_collection)
     analisis = pd.DataFrame(analisis)
     data_and_analisis = pd.merge(data, analisis, on=['comments_id', 'posts_id'], how='left')
+    
+    # solo retornar los 5 primeros
+    data_and_analisis = data_and_analisis.head(5)
+    
     data_and_analisis = data_and_analisis.to_json(orient='records')
     return jsonify(data_and_analisis)
 
