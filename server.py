@@ -21,8 +21,7 @@ def create_app():
     return app
 
 app = create_app()
-
-
+server_tipo= 'production'
 @app.route('/subreddit', methods=['GET'])
 async def get_subreddit():
     start_date_str = '01-01-20 00:00:00'
@@ -228,7 +227,8 @@ def run_gevent_server():
     http_server.serve_forever()
 
 if __name__ == '__main__':
-    app.run()
-else:
+    if server_tipo=='local':
+	app.run()
+    else:
     # If the script is imported as a module, use Gevent WSGI server
-    run_gevent_server()
+    	run_gevent_server()
