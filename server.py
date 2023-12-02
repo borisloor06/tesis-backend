@@ -1,4 +1,5 @@
 from gevent.pywsgi import WSGIServer
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, request
 import pandas as pd
 import requests
@@ -27,6 +28,9 @@ import time
 def create_app():
     app = Flask(__name__)
     app.config["DEBUG"] = True
+    # Use ProxyFix middleware to handle reverse proxy headers
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # Define the db_client instance as a singleton
     if not hasattr(app, "db_client"):
         app.db = db_client()
