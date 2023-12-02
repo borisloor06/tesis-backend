@@ -36,6 +36,10 @@ def create_app():
 app = create_app()
 server_tipo = "production"
 
+@app.route("/", methods=["GET"])
+def home():
+    return "<h1>API</h1><p>This site is a prototype API for analyzing Reddit data.</p>"
+
 
 @app.route("/subreddit", methods=["GET"])
 async def get_subreddit():
