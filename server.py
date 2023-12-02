@@ -1,3 +1,4 @@
+from gevent.pywsgi import WSGIServer
 from flask import Flask, jsonify, request
 import pandas as pd
 import requests
@@ -20,6 +21,7 @@ def create_app():
     return app
 
 app = create_app()
+
 
 @app.route('/subreddit', methods=['GET'])
 async def get_subreddit():
@@ -221,7 +223,12 @@ async def get_topic_extraction():
     topic_extraction = df_topic.to_json(orient='records')
     return jsonify(topic_extraction)
 
-
+def run_gevent_server():
+    http_server = WSGIServer(("127.0.0.1", 8000), app)
+    http_server.serve_forever()
 
 if __name__ == '__main__':
-    app.run(port=80)
+    app.run()
+else:
+    # If the script is imported as a module, use Gevent WSGI server
+    run_gevent_server()
