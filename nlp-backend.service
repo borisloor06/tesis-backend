@@ -1,0 +1,14 @@
+[Unit]
+Description=Natural Language Processing Backend
+After=network.target
+
+[Service]
+WorkingDirectory=/root/nlp-backend/tesis-backend
+ExecStart=/root/nlp-backend/tesis-backend/tesis/bin/python3.10 server.py
+User=root
+Group=root
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

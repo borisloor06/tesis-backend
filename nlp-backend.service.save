@@ -1,0 +1,13 @@
+[Unit]
+Description=Your App Description
+After=network.target
+
+[Service]
+ExecStart=/path/to/venv/bin/python /path/to/your_app.py
+WorkingDirectory=/path/to/your/app
+User=YourUser
+Group=YourUser
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
