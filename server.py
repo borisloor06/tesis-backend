@@ -10,8 +10,7 @@ from src.getDbDataFunctions.getMongoData import (
     getAnalisis,
     getDataUnclean,
 )
-from src.cleanDataFunctions.cleanData import clean_reddit_data, cleanData
-from src.nlpAnalizeFunctions.analyzeData import analize_data, analisis_sentimientos
+from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
 from src.saveDbDataFunctions.saveAnalisis import saveToDB
 from src.nlpAnalizeFunctions.textFunctions import (
@@ -27,13 +26,13 @@ import time
 
 def create_app():
     app = Flask(__name__)
-    app.config["DEBUG"] = True
+    app.config.from_pyfile('settings.py')
     # Use ProxyFix middleware to handle reverse proxy headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # Define the db_client instance as a singleton
     if not hasattr(app, "db_client"):
-        app.db = db_client()
+        app.db = db_client(app)
     return app
 
 

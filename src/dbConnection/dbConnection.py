@@ -1,11 +1,10 @@
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
-def db_client():
+def db_client(app):
     # Replace the placeholder with your Atlas connection string
     # TODO usar variables de entorno
-    uri = "mongodb+srv://scrapper:Z5zP20DlS04dpmQF@myatlasclusteredu.anyvuhn.mongodb.net/?retryWrites=true&w=majority"
-
+    uri = app.config.get("MONGO_URI")
     # Set the Stable API version when creating a new client
     client = MongoClient(uri, server_api=ServerApi('1'))
 
