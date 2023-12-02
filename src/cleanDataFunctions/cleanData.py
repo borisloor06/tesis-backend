@@ -1,7 +1,10 @@
 from functools import lru_cache
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import nltk
+nltk.download('stopwords')
 stop_words = set(stopwords.words('english'))
+
 
 def clean_reddit_data(dataframe, column):
     # Drop duplicates if necessary
