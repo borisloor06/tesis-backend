@@ -1,5 +1,5 @@
 from gevent.pywsgi import WSGIServer
-from flask import Flask, jsonify, request
+from flask import Flask,  request
 import pandas as pd
 import requests
 from src.dbConnection.dbConnection import db_client
@@ -33,7 +33,7 @@ async def get_subreddit():
     posts_df = posts_df.to_json(orient='records', date_format='iso')
     comments_df = comments_df.to_json(orient='records')
 
-    return jsonify(posts_df, comments_df)
+    return posts_df, comments_df
 
 # @Param subreddit: Nombre del subreddit a consultar
 # @Param listing: Tipo de listado a consultar (controversial, best, hot, new, random, rising, top)
@@ -55,10 +55,10 @@ def get_reddit():
         db.data.insert_many(data['data']['children'])
         df = get_results(data)
         print(df)
-        return jsonify(data)
+        return data
     except Exception as e:
         print(e)
-        return jsonify({'error': 'An error occurred'})
+        return {'error': 'An error occurred'}
 
 def get_results(r):
     '''
@@ -150,7 +150,7 @@ async def get_analisis_data():
     data_and_analisis = data_and_analisis.head(5)
     
     data_and_analisis = data_and_analisis.to_json(orient='records')
-    return jsonify(data_and_analisis)
+    return data_and_analisis
 
 @app.route('/sentiment_analisis', methods=['GET'])
 async def get_analisis_sentimientos():
@@ -169,7 +169,7 @@ async def get_analisis_sentimientos():
     df_vader_sentiment = sentiment_analyzer.analyze_sentiments()    
     print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
     vader_sentiment = df_vader_sentiment.to_json(orient='records')
-    return jsonify(vader_sentiment)
+    return vader_sentiment
 
 
 @app.route('/author_analisis', methods=['GET'])
@@ -181,7 +181,7 @@ async def get_author_analisis():
     author_analyzer = AuthorAnalysis(data, 'comments_author', 'comments_body')
     df_author = author_analyzer.analyze_author_patterns()
     author_analisis = df_author.to_json(orient='records')
-    return jsonify(author_analisis)
+    return author_analisis
 
 @app.route('/temporal_analisis', methods=['GET'])
 async def get_temporal_analisis():
@@ -191,7 +191,7 @@ async def get_temporal_analisis():
     temporal_analyzer = TemporalAnalysis(data, 'posts_created', 'comments_subreddit')
     df_time = temporal_analyzer.analyze_temporal_patterns()
     temporal_analisis = df_time.to_json(orient='records')
-    return jsonify(temporal_analisis)
+    return temporal_analisis
 
 @app.route('/comment_post_relationship_analisis', methods=['GET'])
 async def get_comment_post_relationship_analisis():
@@ -201,7 +201,7 @@ async def get_comment_post_relationship_analisis():
     comment_post_relationship_analyzer = CommentPostRelationship(data, 'comments_body', 'posts_title', 'comments_score')
     df_relationship = comment_post_relationship_analyzer.analyze_relationships()
     comment_post_relationship_analisis = df_relationship.to_json(orient='records')
-    return jsonify(comment_post_relationship_analisis)
+    return comment_post_relationship_analisis
 
 @app.route('/keyword_identification', methods=['GET'])
 async def get_keyword_identification():
@@ -211,7 +211,7 @@ async def get_keyword_identification():
     keyword_identifier = KeywordIdentification(data, 'comments_body')
     df_keyword = keyword_identifier.identify_keywords()
     keyword_identification = df_keyword.to_json(orient='records')
-    return jsonify(keyword_identification)
+    return keyword_identification
 
 @app.route('/topic_extraction', methods=['GET'])
 async def get_topic_extraction():
@@ -221,7 +221,7 @@ async def get_topic_extraction():
     topic_extractor = TopicExtraction(data, 'comments_body')
     df_topic = topic_extractor.extract_topics()
     topic_extraction = df_topic.to_json(orient='records')
-    return jsonify(topic_extraction)
+    return topic_extraction
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)
