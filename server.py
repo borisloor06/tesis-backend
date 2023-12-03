@@ -208,7 +208,7 @@ async def get_analisis_data():
     print("-------------------analisis_collection-------------------")
     analisis = await getAnalisis(app.db, analisis_collection)
     print("-------------------analisis-------------------")
-    
+    analisis = pd.DataFrame(analisis)
     print(analisis.head(5))
     data = await joinPostWithComments(app.db, comments_collection, posts_collection)
     print("-------------------data-------------------")
