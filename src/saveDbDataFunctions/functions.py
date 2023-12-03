@@ -1,65 +1,89 @@
 import pandas as pd
 import datetime
-from src.dbConnection.dbConnection import db_client
-import asyncpraw
 from aiohttp import ClientSession
+import asyncpraw
+
+# Define comment_columns and post_columns
+comment_columns = ['body', 'score', 'id', 'subreddit', 'created', 'subreddit_id', 'author', 'created_date']
+post_columns = ['title', 'score', 'id', 'subreddit', 'url', 'num_comments', 'selftext', 'created', 'created_utc', 'author', 'upvote_ratio', 'created_date']
+
+async def fetch_comments_data(comment, comments_collection_name, db):
+    # Fetch and store comments data
+    author = 'sin autor'
+    try:
+        author = comment.author.name
+    except AttributeError:
+        pass
+
+    data = [comment.body, comment.score, comment.id, comment.subreddit.display_name, comment.created, comment._submission.id, author]
+    comment_see = dict(zip(comment_columns[:-1], data))  # Exclude 'created_date' from keys
+    comment_see['created_date'] = datetime.datetime.utcfromtimestamp(comment.created).strftime('%Y-%m-%d %H:%M:%S')
+
+    if db[comments_collection_name].find_one({'id': comment_see['id']}) is None:
+        db[comments_collection_name].insert_one(comment_see)
+    else:
+        db[comments_collection_name].update_one({'id': comment_see['id']}, {'$set': comment_see})
+
+    return comment_see
 
 
-# TODO refactorizar para separar logica en funciones mas pequeñas
-async def get_subreddit_posts(subreddit_name, start_date_str, comments_collection_name='reddit_comments', posts_collection_name='reddit_posts'):
-    # Initialize PRAW
+async def fetch_posts_data(post, posts_collection_name, start_date, db):
+    # Fetch and store posts data
+    date = post.created_utc
+    if date > start_date:
+        author = 'sin autor'
+        try:
+            author = post.author.name
+        except AttributeError:
+            pass
+
+        data = [post.title, post.score, post.id, post.subreddit.display_name, post.url, post.num_comments, post.selftext, post.created, post.created_utc, author, post.upvote_ratio]
+        post_see = dict(zip(post_columns[:-1], data))  # Exclude 'created_date' from keys
+        post_see['created_date'] = datetime.datetime.utcfromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S')
+
+        if db[posts_collection_name].find_one({'id': post_see['id']}) is None:
+            try:
+                db[posts_collection_name].insert_one(post_see)
+            except Exception as e:
+                print(e)
+        else:
+            db[posts_collection_name].update_one({'id': post_see['id']}, {'$set': post_see})
+
+        return post_see
+
+async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_collection_name='reddit_comments', posts_collection_name='reddit_posts'):
     session = ClientSession(trust_env=True)
     reddit = asyncpraw.Reddit(requestor_kwargs={"session": session})
-    db = await db_client()
+    db = app.db
+
     start_date = datetime.datetime.strptime(start_date_str, '%d-%m-%y %H:%M:%S').timestamp()
     subreddit = await reddit.subreddit(subreddit_name, fetch=True)
-    subreddits = subreddit.top(time_filter="all", limit=None)
+    # subreddits = subreddit.new(time_filter="all", limit=None)
+    # subreddits = subreddit.hot(limit=None)
+    print('subreddit: ', subreddit_name)
+    start_time = datetime.datetime.now()
+    subreddits = subreddit.new(limit=None)
+    print('subreddits: ', subreddits)
+    print('time: ', datetime.datetime.now() - start_time)
     comments = []
     posts = []
+    start_time = datetime.datetime.now()
     i = 0
-    comment_columns = ['body', 'score', 'id', 'subreddit', 'created', 'subreddit_id','author']
-    post_columns = ['title', 'score', 'id', 'subreddit', 'url', 'num_comments', 'selftext', 'created', 'created_utc', 'author', 'upvote_ratio']
     async for post in subreddits:
-        date = post.created_utc
+        i += 1
         submission = await reddit.submission(id=post.id, fetch=True)
         await submission.comments.replace_more(limit=0)
-        for comment in submission.comments.list():
-            author = 'sin autor'
-            try:
-                author = comment.author.name
-            except AttributeError:
-                continue
-            data = [comment.body, comment.score, comment.id, comment.subreddit.display_name, comment.created, comment._submission.id, author]
-            comments.append(data)
-            comment_see = dict(zip(comment_columns, data))
-            if(db[comments_collection_name].find_one({'id': comment_see['id']}) is None):
-                db[comments_collection_name].insert_one(comment_see)
-            else:
-                db[comments_collection_name].update_one({'id': comment_see['id']}, {'$set': comment_see})
-            if i == 0:
-                print(vars(comment))
-                print('-------------------')
-                print(vars(submission))
-                print('-------------------')
-                print(vars(post))
-                i += 1
-        if date > start_date:
-            author = 'sin autor'
-            try:
-                author = comment.author.name
-            except AttributeError:
-                continue
-            data = [post.title, post.score, post.id, post.subreddit.display_name, post.url, post.num_comments, post.selftext, post.created, post.created_utc, author, post.upvote_ratio]
-            posts.append(data)
-            post_see = dict(zip(post_columns, data))
-            if(db[posts_collection_name].find_one({'id': post_see['id']}) is None):
-                try:
-                    db[posts_collection_name].insert_one(post_see)
-                except Exception as e:
-                    print(e)
-                    continue
-            else:
-                db[posts_collection_name].update_one({'id': post_see['id']}, {'$set': post_see})
+        print('post: ', post.title)
+        for comment in submission.comments.list()[:10]:
+        # for comment in post.comments.list():
+            print('comment: ', comment.body)
+            comments.append(await fetch_comments_data(comment, comments_collection_name, db))
+
+        posts.append(await fetch_posts_data(post, posts_collection_name, start_date, db))
+        #end for after one post
+        if i == 10:
+            break
+    print('time: ', datetime.datetime.now() - start_time)
     all_posts = pd.DataFrame(posts, columns=post_columns)
     df_comments = pd.DataFrame(comments, columns=comment_columns)
 

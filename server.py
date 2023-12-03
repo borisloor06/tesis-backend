@@ -51,12 +51,22 @@ async def get_subreddit():
     query_comments_collection = f"{query}_comments"
     query_posts_collection = f"{query}_posts"
     posts_df, comments_df = await get_subreddit_posts(
-        query, start_date_str, query_comments_collection, query_posts_collection
+        app, query, start_date_str, query_comments_collection, query_posts_collection
     )
-    posts_df = posts_df.to_json(orient="records", date_format="iso")
-    comments_df = comments_df.to_json(orient="records")
 
-    return posts_df, comments_df
+    comments = comments_df.add_prefix("comments_")
+    posts = posts_df.add_prefix("posts_")
+    result_df = pd.merge(
+        comments,
+        posts,
+        left_on="comments_subreddit_id",
+        right_on="posts_id",
+        how="inner",
+    )
+
+    result_df = result_df.to_json(orient="records", date_format="iso")
+
+    return result_df
 
 
 # @Param subreddit: Nombre del subreddit a consultar
@@ -71,7 +81,7 @@ def get_reddit():
     timeframe = request.args.get("timeframe", default="month")
 
     try:
-        db = db_client().reddit
+        db = app.db["reddit"]
         base_url = f"https://www.reddit.com/r/{subreddit}/{listing}.json?limit={limit}&t={timeframe}"
         response = requests.get(base_url, headers={"User-agent": "yourbot"})
         data = response.json()
