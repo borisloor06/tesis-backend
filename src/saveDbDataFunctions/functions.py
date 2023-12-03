@@ -64,23 +64,15 @@ async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_coll
         subreddits_new = subreddit.new(limit=None)
         comments = []
         posts = []
-        
+
         async def fetchData(subreddits):
-            i = 0
             async for post in subreddits:
-                i += 1
                 submission = await reddit.submission(id=post.id, fetch=True)
                 await submission.comments.replace_more(limit=0)
-                print('post: ', post.title)
-                for comment in submission.comments.list()[:10]:
-                # for comment in post.comments.list():
-                    print('comment: ', comment.body)
+                for comment in submission.comments.list():
                     comments.append(await fetch_comments_data(comment, comments_collection_name, db))
 
                 posts.append(await fetch_posts_data(post, posts_collection_name, start_date, db))
-                #end for after one post
-                if i == 10:
-                    break
 
         await fetchData(subreddits_top)
         await fetchData(subreddits_hot)
