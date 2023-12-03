@@ -22,10 +22,12 @@ from src.nlpAnalizeFunctions.textFunctions import (
     SentimentAnalysis,
 )
 import time
+from flask_cors import CORS
 
 
 def create_app():
     app = Flask(__name__)
+    CORS(app)
     app.config.from_pyfile('settings.py')
     # Use ProxyFix middleware to handle reverse proxy headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -198,13 +200,21 @@ async def test_get_data():
 
 @app.route("/analisis", methods=["GET"])
 async def get_analisis_data():
+    print("-------------------get_analisis_data-------------------")
     query = request.args.get("name", default="ChatGpt")
     analisis_collection = f"{query}_analisis"
     comments_collection = f"{query}_comments"
     posts_collection = f"{query}_posts"
+    print("-------------------analisis_collection-------------------")
     analisis = await getAnalisis(app.db, analisis_collection)
+    print("-------------------analisis-------------------")
+    
+    print(analisis.head(5))
     data = await joinPostWithComments(app.db, comments_collection, posts_collection)
-    analisis = pd.DataFrame(analisis)
+    print("-------------------data-------------------")
+    data = pd.DataFrame(data)
+    print(data.head(5))
+    
     data_and_analisis = pd.merge(
         data, analisis, on=["comments_id", "posts_id"], how="left"
     )
