@@ -1,6 +1,6 @@
 from gevent.pywsgi import WSGIServer
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import pandas as pd
 import requests
 from src.dbConnection.dbConnection import db_client
