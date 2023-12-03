@@ -1,5 +1,7 @@
-FLASK_ENV  - Controls the environment.
-FLASK_DEBUG - Enables debug mode.
-FLASK_RUN_HOST - The host you want to bind your app to.
-FLASK_RUN_PORT - The port you want to use.
-FLASK_APP - The name of the module where the app lives.
+FLASK_ENV=                - Controls the environment.
+FLASK_DEBUG=              - Enables debug mode.
+FLASK_RUN_HOST=           - The host you want to bind your app to.
+FLASK_RUN_PORT=           - The port you want to use.
+FLASK_APP=                - The name of the module where the app lives.
+CACHE_TYPE=               - The type of cache to use.
+CACHE_DEFAULT_TIMEOUT=    - The default timeout (in seconds) to use for the cache.

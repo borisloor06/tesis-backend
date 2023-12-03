@@ -1,6 +1,7 @@
 from gevent.pywsgi import WSGIServer
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, request, jsonify
+from flask_caching import Cache
 import pandas as pd
 import requests
 from src.dbConnection.dbConnection import db_client
@@ -27,11 +28,12 @@ from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
+    cache = Cache(app)
     CORS(app)
+    cache.init_app(app)
     app.config.from_pyfile('settings.py')
     # Use ProxyFix middleware to handle reverse proxy headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-
     # Define the db_client instance as a singleton
     if not hasattr(app, "db_client"):
         app.db = db_client(app)
@@ -124,7 +126,7 @@ async def test_get_data():
     data = cleanData(data)
     print("--- %s clean seconds ---" % (time.time() - start_time))
 
-    # data = data.head(5)
+    data = data.head(50)
     start_time = time.time()
     temporal_analyzer = TemporalAnalysis(data, "posts_created", "comments_subreddit")
     df_time = temporal_analyzer.analyze_temporal_patterns()
@@ -142,11 +144,16 @@ async def test_get_data():
     print("-------------------data-------------------")
     print(data.head(5))
     print(df_sentiment.head(5))
-    start_time = time.time()
 
+    start_time = time.time()
     author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
     df_author = author_analyzer.analyze_author_patterns()
     print("--- %s author analisis seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
+    keyword_identifier = KeywordIdentification(data, "posts_title")
+    df_keyword = keyword_identifier.identify_keywords()
+    print("--- %s keyword analisis seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
     comment_post_relationship_analyzer = CommentPostRelationship(
@@ -165,6 +172,128 @@ async def test_get_data():
     sentiment_analyzer = SentimentAnalysis(data, "comments_body")
     df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
     print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
+
+    dataframe = pd.DataFrame()
+    #sacar el promedio de comentarios por post
+    dataframe["average_comment_post_count"] = df_relationship["comment_post_count"].mean()
+    #sacar el promedio de score por post
+    dataframe["average_comment_post_score"] = df_relationship["average_comment_post_score"].mean()
+    #sacar el promedio de score por comentario
+    dataframe["average_comment_score"] = df_relationship["comments_score"].mean()
+    #sacar el promedio de score por autor
+    dataframe["average_author_comment_score"] = author_analyzer["average_author_comment_score"].mean()
+    #sacar el promedio de comentarios por autor
+    dataframe["average_author_comment_count"] = author_analyzer["author_comment_count"].mean()
+    #obtener el total de comentarios
+    dataframe["total_comments"] = data["comments_id"].nunique()
+    #obtener el total de posts
+    dataframe["total_posts"] = data["posts_id"].nunique()
+    #obtener el total de autores
+    dataframe["total_authors"] = data["comments_author"].nunique()
+    #obtener el promedio de sentimientos
+    dataframe["admiration"] = df_sentiment["admiration"].mean()
+    dataframe["amusement"] = df_sentiment["amusement"].mean()
+    dataframe["anger"] = df_sentiment["anger"].mean()
+    dataframe["annoyance"] = df_sentiment["annoyance"].mean()
+    dataframe["approval"] = df_sentiment["approval"].mean()
+    dataframe["caring"] = df_sentiment["caring"].mean()
+    dataframe["confusion"] = df_sentiment["confusion"].mean()
+    dataframe["curiosity"] = df_sentiment["curiosity"].mean()
+    dataframe["desire"] = df_sentiment["desire"].mean()
+    dataframe["disappointment"] = df_sentiment["disappointment"].mean()
+    dataframe["disapproval"] = df_sentiment["disapproval"].mean()
+    dataframe["disgust"] = df_sentiment["disgust"].mean()
+    dataframe["embarrassment"] = df_sentiment["embarrassment"].mean()
+    dataframe["excitement"] = df_sentiment["excitement"].mean()
+    dataframe["fear"] = df_sentiment["fear"].mean()
+    dataframe["gratitude"] = df_sentiment["gratitude"].mean()
+    dataframe["grief"] = df_sentiment["grief"].mean()
+    dataframe["joy"] = df_sentiment["joy"].mean()
+    dataframe["love"] = df_sentiment["love"].mean()
+    dataframe["nervousness"] = df_sentiment["nervousness"].mean()
+    dataframe["neutral"] = df_sentiment["neutral"].mean()
+    dataframe["optimism"] = df_sentiment["optimism"].mean()
+    dataframe["pride"] = df_sentiment["pride"].mean()
+    dataframe["realization"] = df_sentiment["realization"].mean()
+    dataframe["relief"] = df_sentiment["relief"].mean()
+    dataframe["remorse"] = df_sentiment["remorse"].mean()
+    dataframe["sadness"] = df_sentiment["sadness"].mean()
+    dataframe["surprise"] = df_sentiment["surprise"].mean()
+    # obtener todas las palabras claves unicas unidas por una coma
+    dataframe["keywords"] = df_keyword["posts_title_keyword"].unique().tolist()
+    # obtener el promedio de cada topico
+    dataframe["Chat and Humor"] = df_topic["topic_string"].value_counts()["Chat and Humor"]
+    dataframe["Casual Conversations and Humor"] = df_topic["topic_string"].value_counts()["Casual Conversations and Humor"]
+    dataframe["Superhero and Fantasy"] = df_topic["topic_string"].value_counts()["Superhero and Fantasy"]
+    dataframe["AI and Technology"] = df_topic["topic_string"].value_counts()["AI and Technology"]
+
+    # obtener el promedio de cada sentimiento de varde
+    dataframe["vader_sentiment_score"] = df_vader_sentiment["sentiment_score"].mean()
+    dataframe["positive_vader_sentiment"] = df_vader_sentiment["sentiment_label"].value_counts()["positive"]
+    dataframe["neutral_vader_sentiment"] = df_vader_sentiment["sentiment_label"].value_counts()["neutral"]
+    dataframe["negative_vader_sentiment"] = df_vader_sentiment["sentiment_label"].value_counts()["negative"]
+    dataframe["varder_label"] = dataframe["vader_sentiment_score"].apply(
+            lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
+        )
+
+    #organizar el dataframe para que al subirlo a mongo tenga una estructura como la siguiente:
+    '''
+        {
+            "average_comment_post_count": 0.0,
+            "average_comment_post_score": 0.0,
+            "average_comment_score": 0.0,
+            "average_author_comment_score": 0.0,
+            "average_author_comment_count": 0.0,
+            "total_comments": 0,
+            "total_posts": 0,
+            "total_authors": 0,
+            "transformer_analisis": {
+                "admiration": 0.0,
+                "amusement": 0.0,
+                "anger": 0.0,
+                "annoyance": 0.0,
+                "approval": 0.0,
+                "caring": 0.0,
+                "confusion": 0.0,
+                "curiosity": 0.0,
+                "desire": 0.0,
+                "disappointment": 0.0,
+                "disapproval": 0.0,
+                "disgust": 0.0,
+                "embarrassment": 0.0,
+                "excitement": 0.0,
+                "fear": 0.0,
+                "gratitude": 0.0,
+                "grief": 0.0,
+                "joy": 0.0,
+                "love": 0.0,
+                "nervousness": 0.0,
+                "neutral": 0.0,
+                "optimism": 0.0,
+                "pride": 0.0,
+                "realization": 0.0,
+                "relief": 0.0,
+                "remorse": 0.0,
+                "sadness": 0.0,
+                "surprise": 0.0
+            },
+            "keywords": [],
+            "topic_extraction": {
+                "Chat and Humor": 0,
+                "Casual Conversations and Humor": 0,
+                "Superhero and Fantasy": 0,
+                "AI and Technology": 0
+            },
+            "vader_sentiment": {
+                "vader_sentiment_score": 0.0,
+                "positive_vader_sentiment": 0,
+                "neutral_vader_sentiment": 0,
+                "negative_vader_sentiment": 0
+            }
+        }
+    '''
+    #organizar el dataframe para que al subirlo a mongo tenga una estructura como la anterior
+    
 
     dataframes = [
         data,
@@ -199,6 +328,7 @@ async def test_get_data():
 
 
 @app.route("/analisis", methods=["GET"])
+@cache.cached()
 async def get_analisis_data():
     print("-------------------get_analisis_data-------------------")
     query = request.args.get("name", default="ChatGpt")
@@ -227,6 +357,7 @@ async def get_analisis_data():
 
 
 @app.route("/sentiment_analisis", methods=["GET"])
+@cache.cached()
 async def get_analisis_sentimientos():
     query = request.args.get("name", default="ChatGpt")
     start_time = time.time()
@@ -247,6 +378,7 @@ async def get_analisis_sentimientos():
 
 
 @app.route("/author_analisis", methods=["GET"])
+@cache.cached()
 async def get_author_analisis():
     query = request.args.get("name", default="ChatGpt")
     data = await getDataUnclean(app.db, query)
@@ -259,6 +391,7 @@ async def get_author_analisis():
 
 
 @app.route("/temporal_analisis", methods=["GET"])
+@cache.cached()
 async def get_temporal_analisis():
     query = request.args.get("name", default="ChatGpt")
     data = await getDataUnclean(app.db, query)
@@ -270,6 +403,7 @@ async def get_temporal_analisis():
 
 
 @app.route("/comment_post_relationship_analisis", methods=["GET"])
+@cache.cached()
 async def get_comment_post_relationship_analisis():
     query = request.args.get("name", default="ChatGpt")
     data = await getDataUnclean(app.db, query)
@@ -283,6 +417,7 @@ async def get_comment_post_relationship_analisis():
 
 
 @app.route("/keyword_identification", methods=["GET"])
+@cache.cached()
 async def get_keyword_identification():
     query = request.args.get("name", default="ChatGpt")
     data = await getDataUnclean(app.db, query)
@@ -294,6 +429,7 @@ async def get_keyword_identification():
 
 
 @app.route("/topic_extraction", methods=["GET"])
+@cache.cached()
 async def get_topic_extraction():
     query = request.args.get("name", default="ChatGpt")
     data = await getDataUnclean(app.db, query)

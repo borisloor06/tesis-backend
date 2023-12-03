@@ -96,7 +96,7 @@ class KeywordIdentification:
 
         keywords = vectorizer.get_feature_names_out()
         keyword_counts = X.sum(axis=0).A1
-        keyword_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
+        keyword_df = pd.DataFrame({f"${text_column}_keyword": keywords, f"${text_column}_keyword_counts": keyword_counts})
         self.dataframe = pd.concat([
             self.dataframe,
             keyword_df
@@ -115,22 +115,21 @@ class TopicExtraction:
         X = vectorizer.fit_transform(self.dataframe[self.text_column])
 
         lda = LatentDirichletAllocation(
-            n_components=5, random_state=42
+            n_components=4, random_state=42
         )  # Puedes ajustar el número de tópicos
         topics = lda.fit_transform(X)
         # identify keywords for each topic
-        # n = 30  # Puedes ajustar el número de palabras por tópico
-        # for index, topic in enumerate(lda.components_):
-        #     print(f'The top {n} words for topic #{index}')
-        #     print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
+        n = 30  # Puedes ajustar el número de palabras por tópico
+        for index, topic in enumerate(lda.components_):
+            print(f'The top {n} words for topic #{index}')
+            print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
+
         self.dataframe["topic"] = topics.argmax(axis=1)
         self.dataframe["topic_string"] = self.dataframe["topic"].map({
             0: 'Chat and Humor',
             1: 'Casual Conversations and Humor',
             2: 'Superhero and Fantasy',
-            3: 'Chat and Humor',
             4: 'AI and Technology'
-            # Add more mappings if you have additional topics
         })
         return self.dataframe
 
