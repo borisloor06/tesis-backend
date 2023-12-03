@@ -52,39 +52,41 @@ async def fetch_posts_data(post, posts_collection_name, start_date, db):
         return post_see
 
 async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_collection_name='reddit_comments', posts_collection_name='reddit_posts'):
-    session = ClientSession(trust_env=True)
-    reddit = asyncpraw.Reddit(requestor_kwargs={"session": session})
-    db = app.db
+    async with ClientSession(trust_env=True) as session:
+        reddit = asyncpraw.Reddit(requestor_kwargs={"session": session})
+        db = app.db
 
-    start_date = datetime.datetime.strptime(start_date_str, '%d-%m-%y %H:%M:%S').timestamp()
-    subreddit = await reddit.subreddit(subreddit_name, fetch=True)
-    # subreddits = subreddit.new(time_filter="all", limit=None)
-    # subreddits = subreddit.hot(limit=None)
-    print('subreddit: ', subreddit_name)
-    start_time = datetime.datetime.now()
-    subreddits = subreddit.new(limit=None)
-    print('subreddits: ', subreddits)
-    print('time: ', datetime.datetime.now() - start_time)
-    comments = []
-    posts = []
-    start_time = datetime.datetime.now()
-    i = 0
-    async for post in subreddits:
-        i += 1
-        submission = await reddit.submission(id=post.id, fetch=True)
-        await submission.comments.replace_more(limit=0)
-        print('post: ', post.title)
-        for comment in submission.comments.list()[:10]:
-        # for comment in post.comments.list():
-            print('comment: ', comment.body)
-            comments.append(await fetch_comments_data(comment, comments_collection_name, db))
+        start_date = datetime.datetime.strptime(start_date_str, '%d-%m-%y %H:%M:%S').timestamp()
+        subreddit = await reddit.subreddit(subreddit_name, fetch=True)
 
-        posts.append(await fetch_posts_data(post, posts_collection_name, start_date, db))
-        #end for after one post
-        if i == 10:
-            break
-    print('time: ', datetime.datetime.now() - start_time)
-    all_posts = pd.DataFrame(posts, columns=post_columns)
-    df_comments = pd.DataFrame(comments, columns=comment_columns)
+        subreddits_top = subreddit.top(time_filter="all", limit=None)
+        subreddits_hot = subreddit.hot(limit=None)
+        subreddits_new = subreddit.new(limit=None)
+        comments = []
+        posts = []
+        
+        async def fetchData(subreddits):
+            i = 0
+            async for post in subreddits:
+                i += 1
+                submission = await reddit.submission(id=post.id, fetch=True)
+                await submission.comments.replace_more(limit=0)
+                print('post: ', post.title)
+                for comment in submission.comments.list()[:10]:
+                # for comment in post.comments.list():
+                    print('comment: ', comment.body)
+                    comments.append(await fetch_comments_data(comment, comments_collection_name, db))
 
-    return all_posts, df_comments
+                posts.append(await fetch_posts_data(post, posts_collection_name, start_date, db))
+                #end for after one post
+                if i == 10:
+                    break
+
+        await fetchData(subreddits_top)
+        await fetchData(subreddits_hot)
+        await fetchData(subreddits_new)
+
+        all_posts = pd.DataFrame(posts, columns=post_columns)
+        df_comments = pd.DataFrame(comments, columns=comment_columns)
+
+        return all_posts, df_comments
