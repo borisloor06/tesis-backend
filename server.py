@@ -37,7 +37,6 @@ def create_app():
 
 
 app = create_app()
-server_tipo = "production"
 
 @app.route("/", methods=["GET"])
 def home():
@@ -301,7 +300,7 @@ def run_gevent_server():
 
 
 if __name__ == "__main__":
-    if server_tipo == "local":
+    if app.config["DEBUG"]:
         app.run()
     else:
         # If the script is imported as a module, use Gevent WSGI server
