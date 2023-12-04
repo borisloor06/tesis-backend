@@ -122,13 +122,15 @@ async def test_get_data():
     start_time = time.time()
     data = await getDataUnclean(app.db, query)
     print("--- %s get data seconds ---" % (time.time() - start_time))
-
+    print("dataframe length")
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    print(data.count())
     start_time = time.time()
     data = cleanData(data)
     print("--- %s clean seconds ---" % (time.time() - start_time))
-
+    # eliminar columnas incompletas comments_created_date y posts_created_date
     sentiment_analyzer = SentimentAnalyzer(
-        max_threads=app.config.get("MAX_THREADS", 1)
+        max_threads=int(app.config.get("MAX_THREADS", 1))
     )  # You can adjust the number of threads as needed
     df_sentiment = sentiment_analyzer.analyze_sentiments(
         data, text_column="comments_body"
@@ -174,13 +176,20 @@ async def test_get_data():
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
 
+    print(data["comments_id"].nunique())
+    print(data["posts_id"].nunique())
+    print(data["comments_author"].nunique())
+    print(data["comments_id"].count())
+    print(data["posts_id"].count())	
+    print(data["comments_author"].count())
+
     result_dict = {
         "average_comment_post_count": df_relationship["comment_post_count"].mean(),
         "average_comment_score": data["comments_score"].mean(),
         "average_author_comment_count": df_author["author_comment_count"].mean(),
-        "total_comments": data["comments_id"].count(),
-        "total_posts":  data["posts_id"].count(),
-        "total_authors": data["comments_author"].count(),
+        "total_comments": data["comments_id"].nunique(),
+        "total_posts":  data["posts_id"].nunique(),
+        "total_authors": data["comments_author"].nunique(),
         "transformer_analysis": df_sentiment[["admiration", "amusement", "anger", "annoyance", "approval", "caring",
                                         "confusion", "curiosity", "desire", "disappointment", "disapproval",
                                         "disgust", "embarrassment", "excitement", "fear", "gratitude", "grief",
