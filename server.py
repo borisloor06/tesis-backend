@@ -9,6 +9,7 @@ from src.saveDbDataFunctions.functions import get_subreddit_posts
 from src.getDbDataFunctions.getMongoData import (
     joinPostWithComments,
     getDataUnclean,
+    getAnalisis
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -213,7 +214,7 @@ async def get_analisis_data():
     comments_collection = f"{query}_comments"
     posts_collection = f"{query}_posts"
     start_time = time.time()
-    analisis = await getAllCollectionData(app.db, analisis_collection)
+    analisis = await getAnalisis(app.db, analisis_collection)
     print("--- %s get analisis seconds ---" % (time.time() - start_time))
     print("-------------------analisis-------------------")
     analisis = pd.DataFrame(analisis)
