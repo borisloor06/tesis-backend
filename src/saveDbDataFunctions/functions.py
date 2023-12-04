@@ -54,11 +54,11 @@ async def fetch_posts_data(post, posts_collection_name, start_date, db):
 async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_collection_name='reddit_comments', posts_collection_name='reddit_posts'):
     
     session = ClientSession(trust_env=True)
-    reddit = asyncpraw.Reddit(requestor_kwargs={"session": session}, ratelimit_seconds=780)
+    reddit = asyncpraw.Reddit(requestor_kwargs={"session": session})
     db = app.db
 
     start_date = datetime.datetime.strptime(start_date_str, '%d-%m-%y %H:%M:%S').timestamp()
-    subreddit = await reddit.subreddit(subreddit_name, fetch=True)
+    subreddit = await reddit.subreddit(subreddit_name)
 
     # subreddits_top = subreddit.top(time_filter="all", limit=None)
     # subreddits_hot = subreddit.hot(limit=None)
@@ -68,7 +68,7 @@ async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_coll
 
     async def fetchData(subreddits):
         async for post in subreddits:
-            submission = await reddit.submission(id=post.id, fetch=True)
+            submission = await reddit.submission(id=post.id)
             await submission.comments.replace_more(limit=0)
             for comment in submission.comments.list():
                 comments.append(await fetch_comments_data(comment, comments_collection_name, db))
