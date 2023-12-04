@@ -59,8 +59,8 @@ async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_coll
         start_date = datetime.datetime.strptime(start_date_str, '%d-%m-%y %H:%M:%S').timestamp()
         subreddit = await reddit.subreddit(subreddit_name, fetch=True)
 
-        subreddits_top = subreddit.top(time_filter="all", limit=None)
-        subreddits_hot = subreddit.hot(limit=None)
+        # subreddits_top = subreddit.top(time_filter="all", limit=None)
+        # subreddits_hot = subreddit.hot(limit=None)
         subreddits_new = subreddit.new(limit=None)
         comments = []
         posts = []

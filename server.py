@@ -187,8 +187,8 @@ async def test_get_data():
                                         "relief", "remorse", "sadness", "surprise"]].mean().to_dict(),
         "keywords": {
             "posts": posts_keywords.to_dict(),
-            "comment": comment_keywords.sort_values(axis=1, ascending=False).head(60).to_dict(),
-            "all": keywords.sort_values(axis=1, ascending=False).head(60).to_dict()
+            "comment": comment_keywords.sort_values(ascending=False).head(60).to_dict(),
+            "all": keywords.sort_values(ascending=False).head(60).to_dict()
         },
         "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
         "vader_analysis": {
