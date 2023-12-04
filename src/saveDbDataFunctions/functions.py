@@ -68,10 +68,6 @@ async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_coll
     comments = []
     posts = []
 
-    await fetchData(subreddits_top)
-    await fetchData(subreddits_hot)
-    # await fetchData(subreddits_new)
-
     async def fetchData(subreddits):
         async for post in subreddits:
             try:
@@ -89,6 +85,10 @@ async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_coll
                 comments.append(await fetch_comments_data(comment, comments_collection_name, db))
 
             posts.append(await fetch_posts_data(post, posts_collection_name, start_date, db))
+
+    await fetchData(subreddits_top)
+    await fetchData(subreddits_hot)
+    # await fetchData(subreddits_new)
 
     all_posts = pd.DataFrame(posts, columns=post_columns)
     df_comments = pd.DataFrame(comments, columns=comment_columns)
