@@ -2,6 +2,8 @@ import pandas as pd
 import datetime
 from aiohttp import ClientSession
 import asyncpraw
+from prawcore.exceptions import PrawcoreException
+import time
 
 # Define comment_columns and post_columns
 comment_columns = ['body', 'score', 'id', 'subreddit', 'created', 'subreddit_id', 'author', 'created_date']
@@ -58,26 +60,35 @@ async def get_subreddit_posts(app, subreddit_name, start_date_str, comments_coll
     db = app.db
 
     start_date = datetime.datetime.strptime(start_date_str, '%d-%m-%y %H:%M:%S').timestamp()
-    subreddit = await reddit.subreddit(subreddit_name)
+    subreddit = await reddit.subreddit(subreddit_name, fetch=True)
 
-    # subreddits_top = subreddit.top(time_filter="all", limit=None)
+    subreddits_top = subreddit.top(time_filter="all", limit=None)
     subreddits_hot = subreddit.hot(limit=None)
     # subreddits_new = subreddit.new(limit=None)
     comments = []
     posts = []
 
+    await fetchData(subreddits_top)
+    await fetchData(subreddits_hot)
+    # await fetchData(subreddits_new)
+
     async def fetchData(subreddits):
         async for post in subreddits:
-            submission = await reddit.submission(id=post.id)
-            await submission.comments.replace_more(limit=0)
+            try:
+                submission = await reddit.submission(id=post.id)
+            except (asyncpraw.exceptions.APIException, PrawcoreException):
+                time.sleep(30)
+                submission = await reddit.submission(id=post.id)
+            try:
+                await submission.comments.replace_more(limit=0)
+            except (asyncpraw.exceptions.APIException, PrawcoreException):
+                time.sleep(30)
+                await submission.comments.replace_more(limit=0)
+
             for comment in submission.comments.list():
                 comments.append(await fetch_comments_data(comment, comments_collection_name, db))
 
             posts.append(await fetch_posts_data(post, posts_collection_name, start_date, db))
-
-    # await fetchData(subreddits_top)
-    await fetchData(subreddits_hot)
-    # await fetchData(subreddits_new)
 
     all_posts = pd.DataFrame(posts, columns=post_columns)
     df_comments = pd.DataFrame(comments, columns=comment_columns)
