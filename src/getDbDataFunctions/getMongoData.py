@@ -20,14 +20,14 @@ async def getComments(db, comments_collection_name="reddit_comments"):
         {
             "_id": 0,
         },
-    )
+    ).batch_size(1000)
     return list(cursor)
 
 
 async def getPost(db, posts_collection_name="reddit_posts"):
     cursor = db[posts_collection_name].find(
         {}, {"_id": 0}
-    )
+    ).batch_size(1000)
     return list(cursor)
 
 
@@ -74,5 +74,10 @@ async def getCommentsAndPostConcurrent(
 async def getDataUnclean(db, query):
     comments_collection = f'{query}_comments'
     posts_collection = f'{query}_posts'
+    print(db)
+    comentarios = db[comments_collection].count_documents({})
+    posts = db[posts_collection].count_documents({})
+    print("------------------------COMENTARIOS-----------------------------")
+    print(comentarios, posts)
     data = await joinPostWithComments(db, comments_collection, posts_collection)
     return data

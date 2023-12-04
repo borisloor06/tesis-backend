@@ -7,7 +7,6 @@ import requests
 from src.dbConnection.dbConnection import db_client
 from src.saveDbDataFunctions.functions import get_subreddit_posts
 from src.getDbDataFunctions.getMongoData import (
-    joinPostWithComments,
     getDataUnclean,
     getAnalisis
 )
@@ -117,7 +116,9 @@ def get_results(r):
 async def test_get_data():
     query = request.args.get("name", default="ChatGpt")
     analisis_collection = f"{query}_analisis"
-
+    print("numero de hilos")
+    # get MAX_THREADS from environment variable
+    print(app.config.get("MAX_THREADS", 1))
     start_time = time.time()
     data = await getDataUnclean(app.db, query)
     print("--- %s get data seconds ---" % (time.time() - start_time))
