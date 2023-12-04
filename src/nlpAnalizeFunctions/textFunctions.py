@@ -1,5 +1,4 @@
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 import pandas as pd
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -91,19 +90,12 @@ class KeywordIdentification:
         self.text_column = text_column
 
     def identify_keywords(self):
-        vectorizer = CountVectorizer(stop_words="english")
-        X = vectorizer.fit_transform(self.dataframe[self.text_column])
-
-        keywords = vectorizer.get_feature_names_out()
-        keyword_counts = X.sum(axis=0).A1
-        keyword_df = pd.DataFrame({f"${text_column}_keyword": keywords, f"${text_column}_keyword_counts": keyword_counts})
-        self.dataframe = pd.concat([
-            self.dataframe,
-            keyword_df
-        ], axis=1, )
-
-        return self.dataframe
-
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(self.dataframe[self.text_column])
+        feature_names = vectorizer.get_feature_names_out()
+        result_df = pd.DataFrame(tfidf_matrix.toarray(), columns=feature_names)
+        result_df = result_df.sum(axis=0)
+        return result_df
 
 class TopicExtraction:
     def __init__(self, dataframe, text_column):
@@ -125,11 +117,12 @@ class TopicExtraction:
             print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
 
         self.dataframe["topic"] = topics.argmax(axis=1)
+        print(self.dataframe["topic"])
         self.dataframe["topic_string"] = self.dataframe["topic"].map({
-            0: 'Chat and Humor',
-            1: 'Casual Conversations and Humor',
-            2: 'Superhero and Fantasy',
-            4: 'AI and Technology'
+            0: 'GPT-4 and AI Discussions',
+            1: 'Online Discussions and Debates',
+            2: 'Open Source and Community Support',
+            4: 'Visual Perception and Distortions'
         })
         return self.dataframe
 

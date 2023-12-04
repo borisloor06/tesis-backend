@@ -8,7 +8,6 @@ from src.dbConnection.dbConnection import db_client
 from src.saveDbDataFunctions.functions import get_subreddit_posts
 from src.getDbDataFunctions.getMongoData import (
     joinPostWithComments,
-    getAnalisis,
     getDataUnclean,
 )
 from src.cleanDataFunctions.cleanData import cleanData
@@ -28,9 +27,7 @@ from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
-    cache = Cache(app)
     CORS(app)
-    cache.init_app(app)
     app.config.from_pyfile('settings.py')
     # Use ProxyFix middleware to handle reverse proxy headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -40,7 +37,9 @@ def create_app():
     return app
 
 
+cache = Cache()
 app = create_app()
+cache.init_app(app)
 
 @app.route("/", methods=["GET"])
 def home():
@@ -116,7 +115,7 @@ def get_results(r):
 @app.route("/gpt_data", methods=["GET"])
 async def test_get_data():
     query = request.args.get("name", default="ChatGpt")
-    analisis_collection = f"{query}_analisis"
+    analisis_collection = f"{query}_analisis_test"
 
     start_time = time.time()
     data = await getDataUnclean(app.db, query)
@@ -127,6 +126,7 @@ async def test_get_data():
     print("--- %s clean seconds ---" % (time.time() - start_time))
 
     data = data.head(50)
+
     start_time = time.time()
     temporal_analyzer = TemporalAnalysis(data, "posts_created", "comments_subreddit")
     df_time = temporal_analyzer.analyze_temporal_patterns()
@@ -140,10 +140,6 @@ async def test_get_data():
         data, text_column="comments_body"
     )
     print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
-    # save data to db
-    print("-------------------data-------------------")
-    print(data.head(5))
-    print(df_sentiment.head(5))
 
     start_time = time.time()
     author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
@@ -152,8 +148,14 @@ async def test_get_data():
 
     start_time = time.time()
     keyword_identifier = KeywordIdentification(data, "posts_title")
-    df_keyword = keyword_identifier.identify_keywords()
-    print("--- %s keyword analisis seconds ---" % (time.time() - start_time))
+    posts_keywords = keyword_identifier.identify_keywords()
+    print("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
+    keyword_identifier = KeywordIdentification(data, "comments_body")
+    comment_keywords = keyword_identifier.identify_keywords()
+    print("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
+    keywords =  comment_keywords.add(posts_keywords, fill_value=0)
 
     start_time = time.time()
     comment_post_relationship_analyzer = CommentPostRelationship(
@@ -166,7 +168,7 @@ async def test_get_data():
     start_time = time.time()
     topic_extractor = TopicExtraction(data, "comments_body")
     df_topic = topic_extractor.extract_topics()
-    print("--- %s relaciones analisis seconds ---" % (time.time() - start_time))
+    print("--- %s topic analisis seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
     sentiment_analyzer = SentimentAnalysis(data, "comments_body")
@@ -174,157 +176,46 @@ async def test_get_data():
     print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
 
     dataframe = pd.DataFrame()
-    #sacar el promedio de comentarios por post
-    dataframe["average_comment_post_count"] = df_relationship["comment_post_count"].mean()
-    #sacar el promedio de score por post
-    dataframe["average_comment_post_score"] = df_relationship["average_comment_post_score"].mean()
-    #sacar el promedio de score por comentario
-    dataframe["average_comment_score"] = df_relationship["comments_score"].mean()
-    #sacar el promedio de score por autor
-    dataframe["average_author_comment_score"] = author_analyzer["average_author_comment_score"].mean()
-    #sacar el promedio de comentarios por autor
-    dataframe["average_author_comment_count"] = author_analyzer["author_comment_count"].mean()
-    #obtener el total de comentarios
-    dataframe["total_comments"] = data["comments_id"].nunique()
-    #obtener el total de posts
-    dataframe["total_posts"] = data["posts_id"].nunique()
-    #obtener el total de autores
-    dataframe["total_authors"] = data["comments_author"].nunique()
-    #obtener el promedio de sentimientos
-    dataframe["admiration"] = df_sentiment["admiration"].mean()
-    dataframe["amusement"] = df_sentiment["amusement"].mean()
-    dataframe["anger"] = df_sentiment["anger"].mean()
-    dataframe["annoyance"] = df_sentiment["annoyance"].mean()
-    dataframe["approval"] = df_sentiment["approval"].mean()
-    dataframe["caring"] = df_sentiment["caring"].mean()
-    dataframe["confusion"] = df_sentiment["confusion"].mean()
-    dataframe["curiosity"] = df_sentiment["curiosity"].mean()
-    dataframe["desire"] = df_sentiment["desire"].mean()
-    dataframe["disappointment"] = df_sentiment["disappointment"].mean()
-    dataframe["disapproval"] = df_sentiment["disapproval"].mean()
-    dataframe["disgust"] = df_sentiment["disgust"].mean()
-    dataframe["embarrassment"] = df_sentiment["embarrassment"].mean()
-    dataframe["excitement"] = df_sentiment["excitement"].mean()
-    dataframe["fear"] = df_sentiment["fear"].mean()
-    dataframe["gratitude"] = df_sentiment["gratitude"].mean()
-    dataframe["grief"] = df_sentiment["grief"].mean()
-    dataframe["joy"] = df_sentiment["joy"].mean()
-    dataframe["love"] = df_sentiment["love"].mean()
-    dataframe["nervousness"] = df_sentiment["nervousness"].mean()
-    dataframe["neutral"] = df_sentiment["neutral"].mean()
-    dataframe["optimism"] = df_sentiment["optimism"].mean()
-    dataframe["pride"] = df_sentiment["pride"].mean()
-    dataframe["realization"] = df_sentiment["realization"].mean()
-    dataframe["relief"] = df_sentiment["relief"].mean()
-    dataframe["remorse"] = df_sentiment["remorse"].mean()
-    dataframe["sadness"] = df_sentiment["sadness"].mean()
-    dataframe["surprise"] = df_sentiment["surprise"].mean()
-    # obtener todas las palabras claves unicas unidas por una coma
-    dataframe["keywords"] = df_keyword["posts_title_keyword"].unique().tolist()
-    # obtener el promedio de cada topico
-    dataframe["Chat and Humor"] = df_topic["topic_string"].value_counts()["Chat and Humor"]
-    dataframe["Casual Conversations and Humor"] = df_topic["topic_string"].value_counts()["Casual Conversations and Humor"]
-    dataframe["Superhero and Fantasy"] = df_topic["topic_string"].value_counts()["Superhero and Fantasy"]
-    dataframe["AI and Technology"] = df_topic["topic_string"].value_counts()["AI and Technology"]
-
-    # obtener el promedio de cada sentimiento de varde
-    dataframe["vader_sentiment_score"] = df_vader_sentiment["sentiment_score"].mean()
-    dataframe["positive_vader_sentiment"] = df_vader_sentiment["sentiment_label"].value_counts()["positive"]
-    dataframe["neutral_vader_sentiment"] = df_vader_sentiment["sentiment_label"].value_counts()["neutral"]
-    dataframe["negative_vader_sentiment"] = df_vader_sentiment["sentiment_label"].value_counts()["negative"]
-    dataframe["varder_label"] = dataframe["vader_sentiment_score"].apply(
+    dataframe["average"] = df_vader_sentiment["sentiment_score"].mean()
+    dataframe["label"] = dataframe["average"].apply(
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
 
-    #organizar el dataframe para que al subirlo a mongo tenga una estructura como la siguiente:
-    '''
-        {
-            "average_comment_post_count": 0.0,
-            "average_comment_post_score": 0.0,
-            "average_comment_score": 0.0,
-            "average_author_comment_score": 0.0,
-            "average_author_comment_count": 0.0,
-            "total_comments": 0,
-            "total_posts": 0,
-            "total_authors": 0,
-            "transformer_analisis": {
-                "admiration": 0.0,
-                "amusement": 0.0,
-                "anger": 0.0,
-                "annoyance": 0.0,
-                "approval": 0.0,
-                "caring": 0.0,
-                "confusion": 0.0,
-                "curiosity": 0.0,
-                "desire": 0.0,
-                "disappointment": 0.0,
-                "disapproval": 0.0,
-                "disgust": 0.0,
-                "embarrassment": 0.0,
-                "excitement": 0.0,
-                "fear": 0.0,
-                "gratitude": 0.0,
-                "grief": 0.0,
-                "joy": 0.0,
-                "love": 0.0,
-                "nervousness": 0.0,
-                "neutral": 0.0,
-                "optimism": 0.0,
-                "pride": 0.0,
-                "realization": 0.0,
-                "relief": 0.0,
-                "remorse": 0.0,
-                "sadness": 0.0,
-                "surprise": 0.0
-            },
-            "keywords": [],
-            "topic_extraction": {
-                "Chat and Humor": 0,
-                "Casual Conversations and Humor": 0,
-                "Superhero and Fantasy": 0,
-                "AI and Technology": 0
-            },
-            "vader_sentiment": {
-                "vader_sentiment_score": 0.0,
-                "positive_vader_sentiment": 0,
-                "neutral_vader_sentiment": 0,
-                "negative_vader_sentiment": 0
-            }
+    result_dict = {
+        "average_comment_post_count": df_relationship["comment_post_count"].mean(),
+        "average_comment_score": data["comments_score"].mean(),
+        "average_author_comment_count": df_author["author_comment_count"].mean(),
+        "total_comments": data["comments_id"].nunique(),
+        "total_posts":  data["posts_id"].nunique(),
+        "total_authors": data["comments_author"].nunique(),
+        "transformer_analysis": df_sentiment[["admiration", "amusement", "anger", "annoyance", "approval", "caring",
+                                        "confusion", "curiosity", "desire", "disappointment", "disapproval",
+                                        "disgust", "embarrassment", "excitement", "fear", "gratitude", "grief",
+                                        "joy", "love", "nervousness", "neutral", "optimism", "pride", "realization",
+                                        "relief", "remorse", "sadness", "surprise"]].mean().to_dict(),
+        "keywords": {
+            "posts": posts_keywords.to_dict(),
+            "comment": comment_keywords.sort_values(axis=1, ascending=False).head(50).to_dict(),
+            "all": keywords.sort_values(axis=1, ascending=False).head(50).to_dict()
+        },
+        "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
+        "vader_analysis": {
+            "average": df_vader_sentiment[["sentiment_score"]].mean().to_dict(),
+            "labels": df_vader_sentiment["sentiment_label"].value_counts().to_dict(),
         }
-    '''
-    #organizar el dataframe para que al subirlo a mongo tenga una estructura como la anterior
-    
+    }
 
-    dataframes = [
-        data,
-        df_sentiment,
-        df_time,
-        df_author,
-        df_relationship,
-        df_topic,
-        df_vader_sentiment,
-    ]
-    df_analisis = pd.concat(dataframes, axis=1)
-    print("-------------------df_analisis-------------------")
-    print(df_analisis.head(5))
-    print(df_analisis.columns)
-    df_analisis = df_analisis.drop(
-        columns=[
-            "comments_body",
-            "posts_created",
-            "comments_subreddit",
-            "comments_author",
-            "comments_score",
-            "posts_title",
-            "comments_subreddit_id",
-        ]
-    )
-    print(df_analisis.columns)
+    print("-------------------result_dict-------------------")
+    print(result_dict)
 
-    saveToDB(df_analisis, app.db, analisis_collection)
-    # save data to file
-    data.to_csv("data.csv", index=False, encoding="utf-8")
-    return jsonify({"message": "ok"})
+    # Convertir el resultado a un nuevo DataFrame
+    result_dataframe = pd.DataFrame([result_dict])
+    return jsonify(result_dict)
+
+    # saveToDB(result_dataframe, app.db, analisis_collection)
+    # # save data to file
+    # data.to_csv("data.csv", index=False, encoding="utf-8")
+    # return jsonify({"message": "ok"})
 
 
 @app.route("/analisis", methods=["GET"])
@@ -336,7 +227,7 @@ async def get_analisis_data():
     comments_collection = f"{query}_comments"
     posts_collection = f"{query}_posts"
     print("-------------------analisis_collection-------------------")
-    analisis = await getAnalisis(app.db, analisis_collection)
+    analisis = await getAllCollectionData(app.db, analisis_collection)
     print("-------------------analisis-------------------")
     analisis = pd.DataFrame(analisis)
     print(analisis.head(5))
@@ -344,7 +235,7 @@ async def get_analisis_data():
     print("-------------------data-------------------")
     data = pd.DataFrame(data)
     print(data.head(5))
-    
+
     data_and_analisis = pd.merge(
         data, analisis, on=["comments_id", "posts_id"], how="left"
     )

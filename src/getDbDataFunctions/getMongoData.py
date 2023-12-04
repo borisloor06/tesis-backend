@@ -1,6 +1,7 @@
 import pandas as pd
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from aiocache import cached, Cache
 
 columns_used = [
     "comments_body",
@@ -71,6 +72,7 @@ async def getCommentsAndPostConcurrent(
         posts = await asyncio.to_thread(posts_future.result)
     return [comments, posts]
 
+@cached(ttl=3600, key="getDataClean", cache=Cache.MEMORY)
 async def getDataUnclean(db, query):
     comments_collection = f'{query}_comments'
     posts_collection = f'{query}_posts'
