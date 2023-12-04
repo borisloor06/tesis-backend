@@ -117,7 +117,6 @@ class TopicExtraction:
             print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-n:]])
 
         self.dataframe["topic"] = topics.argmax(axis=1)
-        print(self.dataframe["topic"])
         self.dataframe["topic_string"] = self.dataframe["topic"].map({
             0: 'GPT-4 and AI Discussions',
             1: 'Online Discussions and Debates',

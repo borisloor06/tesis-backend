@@ -39,7 +39,7 @@ def create_app():
 
 cache = Cache()
 app = create_app()
-cache.init_app(app)
+cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 @app.route("/", methods=["GET"])
 def home():
@@ -115,7 +115,7 @@ def get_results(r):
 @app.route("/gpt_data", methods=["GET"])
 async def test_get_data():
     query = request.args.get("name", default="ChatGpt")
-    analisis_collection = f"{query}_analisis_test"
+    analisis_collection = f"{query}_analisis"
 
     start_time = time.time()
     data = await getDataUnclean(app.db, query)
@@ -125,16 +125,8 @@ async def test_get_data():
     data = cleanData(data)
     print("--- %s clean seconds ---" % (time.time() - start_time))
 
-    data = data.head(50)
-
-    start_time = time.time()
-    temporal_analyzer = TemporalAnalysis(data, "posts_created", "comments_subreddit")
-    df_time = temporal_analyzer.analyze_temporal_patterns()
-    print("--- %s temporal analisis seconds ---" % (time.time() - start_time))
-    start_time = time.time()
-
     sentiment_analyzer = SentimentAnalyzer(
-        max_threads=16
+        max_threads=app.config.get("MAX_THREADS", 1)
     )  # You can adjust the number of threads as needed
     df_sentiment = sentiment_analyzer.analyze_sentiments(
         data, text_column="comments_body"
@@ -163,8 +155,7 @@ async def test_get_data():
     )
     df_relationship = comment_post_relationship_analyzer.analyze_relationships()
     print("--- %s relaciones analisis seconds ---" % (time.time() - start_time))
-    # keyword_identifier = KeywordIdentification(data, 'comments_body')
-    # df_keyword = keyword_identifier.identify_keywords()
+
     start_time = time.time()
     topic_extractor = TopicExtraction(data, "comments_body")
     df_topic = topic_extractor.extract_topics()
@@ -195,8 +186,8 @@ async def test_get_data():
                                         "relief", "remorse", "sadness", "surprise"]].mean().to_dict(),
         "keywords": {
             "posts": posts_keywords.to_dict(),
-            "comment": comment_keywords.sort_values(axis=1, ascending=False).head(50).to_dict(),
-            "all": keywords.sort_values(axis=1, ascending=False).head(50).to_dict()
+            "comment": comment_keywords.sort_values(axis=1, ascending=False).head(60).to_dict(),
+            "all": keywords.sort_values(axis=1, ascending=False).head(60).to_dict()
         },
         "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
         "vader_analysis": {
@@ -205,46 +196,30 @@ async def test_get_data():
         }
     }
 
-    print("-------------------result_dict-------------------")
-    print(result_dict)
-
     # Convertir el resultado a un nuevo DataFrame
     result_dataframe = pd.DataFrame([result_dict])
-    return jsonify(result_dict)
 
-    # saveToDB(result_dataframe, app.db, analisis_collection)
+    saveToDB(result_dataframe, app.db, analisis_collection)
     # # save data to file
     # data.to_csv("data.csv", index=False, encoding="utf-8")
-    # return jsonify({"message": "ok"})
+    return jsonify({"message": "ok"})
 
 
 @app.route("/analisis", methods=["GET"])
 @cache.cached()
 async def get_analisis_data():
-    print("-------------------get_analisis_data-------------------")
     query = request.args.get("name", default="ChatGpt")
     analisis_collection = f"{query}_analisis"
     comments_collection = f"{query}_comments"
     posts_collection = f"{query}_posts"
-    print("-------------------analisis_collection-------------------")
+    start_time = time.time()
     analisis = await getAllCollectionData(app.db, analisis_collection)
+    print("--- %s get analisis seconds ---" % (time.time() - start_time))
     print("-------------------analisis-------------------")
     analisis = pd.DataFrame(analisis)
     print(analisis.head(5))
-    data = await joinPostWithComments(app.db, comments_collection, posts_collection)
-    print("-------------------data-------------------")
-    data = pd.DataFrame(data)
-    print(data.head(5))
 
-    data_and_analisis = pd.merge(
-        data, analisis, on=["comments_id", "posts_id"], how="left"
-    )
-
-    # solo retornar los 5 primeros
-    data_and_analisis = data_and_analisis.head(5)
-
-    data_and_analisis = data_and_analisis.to_json(orient="records")
-    return data_and_analisis
+    return analisis.to_json(orient="records")
 
 
 @app.route("/sentiment_analisis", methods=["GET"])
