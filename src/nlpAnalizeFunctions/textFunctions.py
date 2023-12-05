@@ -1,4 +1,4 @@
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 import pandas as pd
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -90,11 +90,10 @@ class KeywordIdentification:
         self.text_column = text_column
 
     def identify_keywords(self):
-        vectorizer = TfidfVectorizer()
+        vectorizer = CountVectorizer()
         tfidf_matrix = vectorizer.fit_transform(self.dataframe[self.text_column])
         feature_names = vectorizer.get_feature_names_out()
-        result_df = pd.DataFrame(tfidf_matrix.toarray(), columns=feature_names)
-        result_df = result_df.sum(axis=0)
+        result_df = pd.DataFrame({"feature_names": feature_names, "tfidf_sum": tfidf_matrix.sum(axis=0).A1})
         return result_df
 
 class TopicExtraction:

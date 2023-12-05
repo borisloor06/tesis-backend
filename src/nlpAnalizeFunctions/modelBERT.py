@@ -10,8 +10,13 @@ class SentimentAnalyzer:
     def __init__(self, model_name="SamLowe/roberta-base-go_emotions", max_threads=4):
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        print(torch.cuda.is_available())
+        print(torch.cuda.current_device())
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
+        print(self.device)
+        print(torch.cuda.get_device_name(0))
+        print(torch.cuda.memory_allocated())
+        self.model = self.model.to(self.device)
         self.sentiment_columns = [
             "disappointment",
             "sadness",
