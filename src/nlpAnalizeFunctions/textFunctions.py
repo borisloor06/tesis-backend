@@ -1,4 +1,4 @@
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 import pandas as pd
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -97,6 +97,19 @@ class KeywordIdentification:
         result_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
         return result_df
 
+class KeywordTfidfIdentification:
+    def __init__(self, dataframe, text_column):
+        self.dataframe = dataframe
+        self.text_column = text_column
+
+    def identify_keywords(self):
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(self.dataframe[self.text_column])
+        keywords  = vectorizer.get_feature_names_out()
+        keyword_counts = tfidf_matrix.sum(axis=0).A1
+        result_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
+        return result_df
+
 class TopicExtraction:
     def __init__(self, dataframe, text_column):
         self.dataframe = dataframe
@@ -107,7 +120,7 @@ class TopicExtraction:
         X = vectorizer.fit_transform(self.dataframe[self.text_column])
 
         lda = LatentDirichletAllocation(
-            n_components=4, random_state=42
+            n_components=5, random_state=42
         )  # Puedes ajustar el número de tópicos
         topics = lda.fit_transform(X)
         # identify keywords for each topic
@@ -118,10 +131,11 @@ class TopicExtraction:
 
         self.dataframe["topic"] = topics.argmax(axis=1)
         self.dataframe["topic_string"] = self.dataframe["topic"].map({
-            0: 'GPT-4 and AI Discussions',
-            1: 'Online Discussions and Debates',
-            2: 'Open Source and Community Support',
-            4: 'Visual Perception and Distortions'
+            0: 'Chat and Interaction',
+            1: 'Companies and Technology',
+            2: 'Writing and Information',
+            3: 'Artificial Intelligence and Humanity',
+            4: 'Life and Philosophy'
         })
         return self.dataframe
 
