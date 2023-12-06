@@ -168,6 +168,5 @@ class ResumeAnalisis:
         min_date = self.dataframe [self.date_column].min()
         max_date = self.dataframe [self.date_column].max()
 
-        # Imprimir el rango de fechas
-        message = f'Rango de fechas: Desde {min_date} hasta {max_date}'
-        return message
+        #retornar fecha de inicio y fin, como diccionario
+        return {'fecha_inicio': min_date, 'fecha_fin': max_date}
