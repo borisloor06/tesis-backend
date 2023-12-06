@@ -22,6 +22,7 @@ from src.nlpAnalizeFunctions.textFunctions import (
     KeywordIdentification,
     TopicExtraction,
     SentimentAnalysis,
+    ResumeAnalisis
 )
 import time
 from flask_cors import CORS
@@ -177,12 +178,19 @@ async def test_get_data():
     sentiment_analyzer = SentimentAnalysis(data, "comments_body")
     df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
     print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
+    
+    # about = ResumeAnalisis(data, 'comments_created_date')
+    # comments_time = about.resume_analisis()
+    # about = ResumeAnalisis(data, 'posts_created_date')
+    # posts_time = about.resume_analisis()
+
 
     dataframe = pd.DataFrame()
     dataframe["average"] = df_vader_sentiment["sentiment_score"].mean()
     dataframe["label"] = dataframe["average"].apply(
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
+    
 
     print(data["comments_id"].nunique())
     print(data["posts_id"].nunique())
@@ -352,6 +360,18 @@ async def agregar_data():
             print(f"Post con ID {post_id} insertado en MongoDB.")
         else:
             print(f"Post con ID {post_id} ya existe en MongoDB. No se ha insertado.")
+
+@app.route("/get_comments", methods=["GET"])
+@cache.cached()
+async def get_comments():
+    query = request.args.get("name", default="ChatGpt")
+    comments_collection = f"{query}_comments"
+    comments = await getComments(app.db, comments_collection)
+    comments = pd.DataFrame(comments)
+    about = ResumeAnalisis(comments, 'created_date')
+    message = about.resume_analisis()
+
+    return {"message": message}
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)

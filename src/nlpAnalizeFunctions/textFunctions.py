@@ -141,3 +141,19 @@ class SentimentAnalysis:
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
         return self.dataframe
+
+class ResumeAnalisis:
+    def __init__(self, dataframe, date_column):
+        self.dataframe = dataframe
+        self.date_column = date_column
+
+    def resume_analisis(self):
+        self.dataframe[self.date_column] = pd.to_datetime(self.dataframe [self.date_column])
+
+        # Encontrar la fecha mínima y máxima en el DataFrame
+        min_date = self.dataframe [self.date_column].min()
+        max_date = self.dataframe [self.date_column].max()
+
+        # Imprimir el rango de fechas
+        message = f'Rango de fechas: Desde {min_date} hasta {max_date}'
+        return message
