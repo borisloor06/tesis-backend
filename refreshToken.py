@@ -2,8 +2,10 @@
 
 """This example demonstrates the flow for retrieving a refresh token.
 
-This tool can be used to conveniently create refresh tokens for later use with your web
-application OAuth2 credentials.
+
+
+This tool can be used to conveniently create refresh tokens for later use with
+your web application OAuth2 credentials.
 
 To create a Reddit application visit the following link while logged into the account
 you want to create a refresh token for: https://www.reddit.com/prefs/apps/
@@ -23,19 +25,22 @@ Usage:
     python3 obtain_refresh_token.py
 
 """
+import asyncio
 import random
 import socket
 import sys
 
-import praw
+import asyncpraw
 
 
-def main():
+async def main():
     """Provide the program's entry point when directly executed."""
-    scope_input = "read,mysubreddits"
+    scope_input = input(
+        "Enter a comma separated list of scopes, or '*' for all scopes: "
+    )
     scopes = [scope.strip() for scope in scope_input.strip().split(",")]
 
-    reddit = praw.Reddit(
+    reddit = asyncpraw.Reddit(
         redirect_uri="http://localhost:8080",
         user_agent="obtain_refresh_token/v0 by u/bboe",
     )
@@ -60,8 +65,9 @@ def main():
         send_message(client, params["error"])
         return 1
 
-    refresh_token = reddit.auth.authorize(params["code"])
+    refresh_token = await reddit.auth.authorize(params["code"])
     send_message(client, f"Refresh token: {refresh_token}")
+    await reddit.close()
     return 0
 
 
@@ -88,4 +94,5 @@ def send_message(client, message):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    loop = asyncio.get_event_loop()
+    sys.exit(loop.run_until_complete(main()))

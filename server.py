@@ -8,7 +8,9 @@ from src.dbConnection.dbConnection import db_client
 from src.saveDbDataFunctions.functions import get_subreddit_posts
 from src.getDbDataFunctions.getMongoData import (
     getDataUnclean,
-    getAnalisis
+    getAnalisis,
+    getComments,
+    getPost
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -322,6 +324,34 @@ async def get_topic_extraction():
     topic_extraction = df_topic.to_json(orient="records")
     return topic_extraction
 
+@app.route("/agregar_data", methods=["GET"])
+async def agregar_data():
+    import json
+    with open('atlas_data.json') as f:
+        data = json.load(f)
+
+    # Iterar a través de los comentarios y agregarlos a MongoDB si el ID no existe
+    for comment in data["comments"]:
+        comment_id = comment["id"]
+
+        # Verificar si el comentario ya existe en la colección
+        if app.db.ChatGpt_comments.find_one({"id": comment_id}) is None:
+            # Insertar el comentario si no existe
+            app.db.ChatGpt_comments.insert_one(comment)
+            print(f"Comentario con ID {comment_id} insertado en MongoDB.")
+        else:
+            print(f"Comentario con ID {comment_id} ya existe en MongoDB. No se ha insertado.")
+
+    for post in data["posts"]:
+        post_id = post["id"]
+
+        # Verificar si el comentario ya existe en la colección
+        if app.db.ChatGpt_posts.find_one({"id": post_id}) is None:
+            # Insertar el comentario si no existe
+            app.db.ChatGpt_posts.insert_one(post)
+            print(f"Post con ID {post_id} insertado en MongoDB.")
+        else:
+            print(f"Post con ID {post_id} ya existe en MongoDB. No se ha insertado.")
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)
