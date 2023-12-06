@@ -3,7 +3,6 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import nltk
 nltk.download('stopwords')
-stop_words = set(stopwords.words('english'))
 
 
 def clean_reddit_data(dataframe, column):
@@ -43,6 +42,7 @@ def clean_data(text):
     
 @lru_cache()
 def delete_stopwords(text):
+    stop_words = set(stopwords.words('english'))
     if not validar_str(text):
         return text
     # Usar un conjunto para las stopwords
