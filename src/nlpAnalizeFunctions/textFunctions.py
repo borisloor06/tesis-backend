@@ -92,8 +92,9 @@ class KeywordIdentification:
     def identify_keywords(self):
         vectorizer = CountVectorizer()
         tfidf_matrix = vectorizer.fit_transform(self.dataframe[self.text_column])
-        feature_names = vectorizer.get_feature_names_out()
-        result_df = pd.DataFrame({"feature_names": feature_names, "tfidf_sum": tfidf_matrix.sum(axis=0).A1})
+        keywords  = vectorizer.get_feature_names_out()
+        keyword_counts = tfidf_matrix.sum(axis=0).A1
+        result_df = pd.DataFrame({"keyword": keywords, "keyword_counts": keyword_counts})
         return result_df
 
 class TopicExtraction:

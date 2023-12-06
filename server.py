@@ -129,6 +129,23 @@ async def test_get_data():
     data = cleanData(data)
     print("--- %s clean seconds ---" % (time.time() - start_time))
     # eliminar columnas incompletas comments_created_date y posts_created_date
+
+    start_time = time.time()
+    keyword_identifier = KeywordIdentification(data, "posts_title")
+    posts_keywords = keyword_identifier.identify_keywords()
+    print("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
+    keyword_identifier = KeywordIdentification(data, "comments_body")
+    comment_keywords = keyword_identifier.identify_keywords()
+    print("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
+    keywords = pd.merge(posts_keywords, comment_keywords, on="keyword", how="outer")
+    keywords["total_counts"] = keywords["keyword_counts_x"].add(keywords["keyword_counts_y"], fill_value=0)
+    keywords = keywords.drop(columns=["keyword_counts_x", "keyword_counts_y"], axis=1)
+    posts_keywords = posts_keywords.set_index('keyword')['keyword_counts'].to_dict()
+    keywords = keywords.sort_values(by="total_counts",ascending=False, ignore_index=True).set_index('keyword')['total_counts'].head(60).to_dict()
+    comment_keywords = comment_keywords.sort_values(by="keyword_counts", ascending=False, ignore_index=True).set_index('keyword')['keyword_counts'].head(60).to_dict()
+
     sentiment_analyzer = SentimentAnalyzer(
         max_threads=int(app.config.get("MAX_THREADS", 1))
     )  # You can adjust the number of threads as needed
@@ -141,17 +158,6 @@ async def test_get_data():
     author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
     df_author = author_analyzer.analyze_author_patterns()
     print("--- %s author analisis seconds ---" % (time.time() - start_time))
-
-    start_time = time.time()
-    keyword_identifier = KeywordIdentification(data, "posts_title")
-    posts_keywords = keyword_identifier.identify_keywords()
-    print("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
-
-    start_time = time.time()
-    keyword_identifier = KeywordIdentification(data, "comments_body")
-    comment_keywords = keyword_identifier.identify_keywords()
-    print("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
-    keywords =  comment_keywords.add(posts_keywords, fill_value=0)
 
     start_time = time.time()
     comment_post_relationship_analyzer = CommentPostRelationship(
@@ -196,9 +202,9 @@ async def test_get_data():
                                         "joy", "love", "nervousness", "neutral", "optimism", "pride", "realization",
                                         "relief", "remorse", "sadness", "surprise"]].mean().to_dict(),
         "keywords": {
-            "posts": posts_keywords.to_dict(),
-            "comment": comment_keywords.sort_values(ascending=False).head(60).to_dict(),
-            "all": keywords.sort_values(ascending=False).head(60).to_dict()
+            "posts": posts_keywords,
+            "comment": comment_keywords,
+            "all": keywords
         },
         "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
         "vader_analysis": {
