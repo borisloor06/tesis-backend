@@ -1,18 +1,14 @@
 # Para aprovechar al máximo los recursos y obtener el mejor rendimiento posible, puedes implementar paralelismo y procesamiento en lotes (batch processing) en tu código. Esto te permitirá procesar múltiples textos simultáneamente y acelerar el análisis de sentimientos. Además, puedes utilizar la biblioteca concurrent.futures para realizar el procesamiento en paralelo. Aquí tienes una versión mejorada del código:
 
-import torch
 import pandas as pd
 from transformers import pipeline
 
 
 class SentimentAnalyzer:
     def __init__(self, model_name="SamLowe/roberta-base-go_emotions"):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.sentiment_analysis_pipe = pipeline(
             "sentiment-analysis",
-            framework="pt",
             model=model_name,
-            device=self.device,
             truncation=True,
             max_length=512,
         )
