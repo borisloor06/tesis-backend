@@ -120,15 +120,15 @@ def get_results(r):
 async def test_get_data():
     query = request.args.get("name", default="ChatGpt")
     analisis_collection = f"{query}_analisis"
-    print("numero de hilos")
+    # print("numero de hilos")
     # get MAX_THREADS from environment variable
-    print(app.config.get("MAX_THREADS", 1))
+    # print(app.config.get("MAX_THREADS", 1))
     start_time = time.time()
     data = await getDataUnclean(app.db, query)
     print("--- %s get data seconds ---" % (time.time() - start_time))
-    print("dataframe length")
-    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
-    print(data.count())
+    # print("dataframe length")
+    # data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    # print(data.count())
     start_time = time.time()
     data = cleanData(data)
     print("--- %s clean seconds ---" % (time.time() - start_time))
@@ -162,7 +162,7 @@ async def test_get_data():
     df_sentiment = sentiment_analyzer.getSentiment(
         data, text_column="comments_body"
     )
-    print("--- %s emotions analisis seconds ---" % (time.time() - start_time))
+    print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
     author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
@@ -174,7 +174,7 @@ async def test_get_data():
         data, "comments_body", "posts_title", "comments_score"
     )
     df_relationship = comment_post_relationship_analyzer.analyze_relationships()
-    print("--- %s relaciones analisis seconds ---" % (time.time() - start_time))
+    print("--- %s relaciones comment post analisis seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
     topic_extractor = TopicExtraction(data, "comments_body")
@@ -184,20 +184,18 @@ async def test_get_data():
     start_time = time.time()
     sentiment_analyzer = SentimentAnalysis(data, "comments_body")
     df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
-    print("--- %s sentiment analisis varder seconds ---" % (time.time() - start_time))
-    
-    # about = ResumeAnalisis(data, 'comments_created_date')
-    # comments_time = about.resume_analisis()
-    # about = ResumeAnalisis(data, 'posts_created_date')
-    # posts_time = about.resume_analisis()
+    print("--- %s varder sentiment analisis seconds ---" % (time.time() - start_time))
 
+    about = ResumeAnalisis(data, 'comments_created_date')
+    comments_time = about.resume_analisis()
+    about = ResumeAnalisis(data, 'posts_created_date')
+    posts_time = about.resume_analisis()
 
     dataframe = pd.DataFrame()
     dataframe["average"] = df_vader_sentiment["sentiment_score"].mean()
     dataframe["label"] = dataframe["average"].apply(
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
-    
 
     print(data["comments_id"].nunique())
     print(data["posts_id"].nunique())
@@ -207,6 +205,8 @@ async def test_get_data():
     print(data["comments_author"].count())
 
     result_dict = {
+        "comments_dates": comments_time,
+        "posts_dates": posts_time,
         "average_comment_post_count": df_relationship["comment_post_count"].mean(),
         "average_comment_score": data["comments_score"].mean(),
         "average_author_comment_count": df_author["author_comment_count"].mean(),
@@ -214,14 +214,14 @@ async def test_get_data():
         "total_posts":  data["posts_id"].nunique(),
         "total_authors": data["comments_author"].nunique(),
         "emotion_analysis": {
-            "total_count": df_emotions["label"].count(),
-            "total_average": df_emotions[["score"]].mean(),
+            "total_count": float(df_emotions["label"].count()),
+            "total_average": df_emotions["score"].mean(),
             "average": df_emotions.groupby(["label"])["score"].mean().to_dict(),
             "count": df_emotions["label"].value_counts().to_dict()
         },
         "transformer_analysis": {
-            "total_count": df_sentiment["label"].count(),
-            "total_average": df_sentiment[["score"]].mean(),
+            "total_count": float(df_sentiment["label"].count()),
+            "total_average": df_sentiment["score"].mean(),
             "average": df_sentiment.groupby(["label"])["score"].mean().to_dict(),
             "count": df_sentiment["label"].value_counts().to_dict()
         },
@@ -232,8 +232,8 @@ async def test_get_data():
         },
         "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
         "vader_analysis": {
-            "total_count": df_sentiment["label"].count(),
-            "total_average": df_vader_sentiment[["sentiment_score"]].mean(),
+            "total_count": float(df_sentiment["label"].count()),
+            "total_average": df_vader_sentiment["sentiment_score"].mean(),
             "average": df_vader_sentiment.groupby(["sentiment_label"])["sentiment_score"].mean().to_dict(),
             "count": df_vader_sentiment["sentiment_label"].value_counts().to_dict(),
         }
@@ -469,8 +469,8 @@ async def get_sent_pipeline():
 
     return {
         "transformer_analysis": {
-            "total_count": df_sentiment["label"].count(),
-            "total_average": df_sentiment[["score"]].mean(),
+            "total_count": float(df_sentiment["label"].count()),
+            "total_average": df_sentiment["score"].mean(),
             "average": mean,
             "count": score
         }
