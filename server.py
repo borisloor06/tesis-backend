@@ -10,7 +10,6 @@ from src.getDbDataFunctions.getMongoData import (
     getDataUnclean,
     getAnalisis,
     getComments,
-    getPost
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
