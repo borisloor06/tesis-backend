@@ -22,7 +22,8 @@ from src.nlpAnalizeFunctions.textFunctions import (
     KeywordIdentification,
     TopicExtraction,
     SentimentAnalysis,
-    ResumeAnalisis
+    ResumeAnalisis,
+    KeywordTfidfIdentification
 )
 import time
 from flask_cors import CORS
@@ -149,13 +150,19 @@ async def test_get_data():
     keywords = keywords.sort_values(by="total_counts",ascending=False, ignore_index=True).set_index('keyword')['total_counts'].head(60).to_dict()
     comment_keywords = comment_keywords.sort_values(by="keyword_counts", ascending=False, ignore_index=True).set_index('keyword')['keyword_counts'].head(60).to_dict()
 
-    sentiment_analyzer = SentimentAnalyzer(
-        max_threads=int(app.config.get("MAX_THREADS", 1))
-    )  # You can adjust the number of threads as needed
-    df_sentiment = sentiment_analyzer.analyze_sentiments(
+    start_time = time.time()
+    sentiment_analyzer = SentimentAnalyzer()
+    df_emotions = sentiment_analyzer.getSentiment(
         data, text_column="comments_body"
     )
-    print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
+    print("--- %s emotions analisis seconds ---" % (time.time() - start_time))
+    
+    start_time = time.time()
+    sentiment_analyzer = SentimentAnalyzer(model_name="cardiffnlp/twitter-roberta-base-sentiment-latest")
+    df_sentiment = sentiment_analyzer.getSentiment(
+        data, text_column="comments_body"
+    )
+    print("--- %s emotions analisis seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
     author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
@@ -206,11 +213,18 @@ async def test_get_data():
         "total_comments": data["comments_id"].nunique(),
         "total_posts":  data["posts_id"].nunique(),
         "total_authors": data["comments_author"].nunique(),
-        "transformer_analysis": df_sentiment[["admiration", "amusement", "anger", "annoyance", "approval", "caring",
-                                        "confusion", "curiosity", "desire", "disappointment", "disapproval",
-                                        "disgust", "embarrassment", "excitement", "fear", "gratitude", "grief",
-                                        "joy", "love", "nervousness", "neutral", "optimism", "pride", "realization",
-                                        "relief", "remorse", "sadness", "surprise"]].mean().to_dict(),
+        "emotion_analysis": {
+            "total_count": df_emotions["label"].count(),
+            "total_average": df_emotions[["score"]].mean(),
+            "average": df_emotions.groupby(["label"])["score"].mean().to_dict(),
+            "count": df_emotions["label"].value_counts().to_dict()
+        },
+        "transformer_analysis": {
+            "total_count": df_sentiment["label"].count(),
+            "total_average": df_sentiment[["score"]].mean(),
+            "average": df_sentiment.groupby(["label"])["score"].mean().to_dict(),
+            "count": df_sentiment["label"].value_counts().to_dict()
+        },
         "keywords": {
             "posts": posts_keywords,
             "comment": comment_keywords,
@@ -218,8 +232,10 @@ async def test_get_data():
         },
         "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
         "vader_analysis": {
-            "average": df_vader_sentiment[["sentiment_score"]].mean().to_dict(),
-            "labels": df_vader_sentiment["sentiment_label"].value_counts().to_dict(),
+            "total_count": df_sentiment["label"].count(),
+            "total_average": df_vader_sentiment[["sentiment_score"]].mean(),
+            "average": df_vader_sentiment.groupby(["sentiment_label"])["sentiment_score"].mean().to_dict(),
+            "count": df_vader_sentiment["sentiment_label"].value_counts().to_dict(),
         }
     }
 
@@ -237,8 +253,7 @@ async def test_get_data():
 async def get_analisis_data():
     query = request.args.get("name", default="ChatGpt")
     analisis_collection = f"{query}_analisis"
-    comments_collection = f"{query}_comments"
-    posts_collection = f"{query}_posts"
+
     start_time = time.time()
     analisis = await getAnalisis(app.db, analisis_collection)
     print("--- %s get analisis seconds ---" % (time.time() - start_time))
@@ -255,7 +270,6 @@ async def get_analisis_sentimientos():
     query = request.args.get("name", default="ChatGpt")
     start_time = time.time()
     data = await getDataUnclean(app.db, query)
-
     print("--- %s get data seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
@@ -372,6 +386,95 @@ async def get_comments():
     message = about.resume_analisis()
 
     return {"message": message}
+
+@app.route("/get-keywords", methods=["GET"])
+@cache.cached()
+async def get_keywords():
+    query = request.args.get("name", default="ChatGpt")
+    data = await getDataUnclean(app.db, query)
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    data = cleanData(data)
+    keyword_identifier = KeywordIdentification(data, "comments_body")
+    df_comments_keyword = keyword_identifier.identify_keywords()
+    comments_keywords = df_comments_keyword.sort_values(by="keyword_counts", ascending=False, ignore_index=True).set_index('keyword')['keyword_counts'].head(60).to_dict()
+    keyword_identifier = KeywordIdentification(data, "posts_title")
+    df_posts_keywords = keyword_identifier.identify_keywords()
+    posts_keywords = df_posts_keywords.set_index('keyword')['keyword_counts'].to_dict()
+    keywords = pd.merge(df_posts_keywords, df_comments_keyword, on="keyword", how="outer")
+    keywords["total_counts"] = keywords["keyword_counts_x"].add(keywords["keyword_counts_y"], fill_value=0)
+    keywords = keywords.drop(columns=["keyword_counts_x", "keyword_counts_y"], axis=1)
+    keywords = keywords.sort_values(by="total_counts",ascending=False, ignore_index=True).set_index('keyword')['total_counts'].head(60).to_dict()
+
+    data = {"keywords": {
+            "posts": posts_keywords,
+            "comment": comments_keywords,
+            "all": keywords
+        },}
+    return data
+
+@app.route("/get-keywords-2", methods=["GET"])
+@cache.cached()
+async def get_keywords2():
+    query = request.args.get("name", default="ChatGpt")
+    data = await getDataUnclean(app.db, query)
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    data = cleanData(data)
+    keyword_identifier = KeywordTfidfIdentification(data, "comments_body")
+    df_comments_keyword = keyword_identifier.identify_keywords()
+    comments_keywords = df_comments_keyword.sort_values(by="keyword_counts", ascending=False, ignore_index=True).set_index('keyword')['keyword_counts'].head(60).to_dict()
+    keyword_identifier = KeywordTfidfIdentification(data, "posts_title")
+    df_posts_keywords = keyword_identifier.identify_keywords()
+    posts_keywords = df_posts_keywords.set_index('keyword')['keyword_counts'].to_dict()
+    keywords = pd.merge(df_posts_keywords, df_comments_keyword, on="keyword", how="outer")
+    keywords["total_counts"] = keywords["keyword_counts_x"].add(keywords["keyword_counts_y"], fill_value=0)
+    keywords = keywords.drop(columns=["keyword_counts_x", "keyword_counts_y"], axis=1)
+    keywords = keywords.sort_values(by="total_counts",ascending=False, ignore_index=True).set_index('keyword')['total_counts'].head(60).to_dict()
+
+    data = {"keywords": {
+            "posts": posts_keywords,
+            "comment": comments_keywords,
+            "all": keywords
+        },}
+    return data
+
+@app.route("/get-topic", methods=["GET"])
+@cache.cached()
+async def get_tp():
+    query = request.args.get("name", default="ChatGpt")
+    data = await getDataUnclean(app.db, query)
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    data = cleanData(data)
+    start_time = time.time()
+    topic_extractor = TopicExtraction(data, "comments_body")
+    df_topic = topic_extractor.extract_topics()
+    print("--- %s topic analisis seconds ---" % (time.time() - start_time))
+    return df_topic.value_counts().to_dict()
+
+@app.route("/test-pipeline", methods=["GET"])
+@cache.cached()
+async def get_sent_pipeline():
+    query = request.args.get("name", default="ChatGpt")
+    data = await getDataUnclean(app.db, query)
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    data = data.head(10)
+    data = cleanData(data)
+    start_time = time.time()
+    sentimentAnalizer = SentimentAnalyzer(model_name="cardiffnlp/twitter-roberta-base-sentiment-latest")
+    df_sentiment = sentimentAnalizer.getSentiment(data, "comments_body")
+    print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
+    mean = df_sentiment.groupby(["label"])["score"].mean().to_dict() 
+    score = df_sentiment["label"].value_counts().to_dict()
+    print(mean)
+    print(df_sentiment["label"].value_counts().to_dict())
+
+    return {
+        "transformer_analysis": {
+            "total_count": df_sentiment["label"].count(),
+            "total_average": df_sentiment[["score"]].mean(),
+            "average": mean,
+            "count": score
+        }
+    }
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)
