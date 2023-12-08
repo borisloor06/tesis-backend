@@ -116,7 +116,7 @@ def get_results(r):
     return df
 
 
-@app.route("/gpt_data", methods=["GET"])
+@app.route("/make_analisis", methods=["GET"])
 async def test_get_data():
     logging.info("--- start analisis ---")
 
@@ -234,9 +234,9 @@ async def test_get_data():
         print(e)
     
     about = ResumeAnalisis(data, 'comments_created')
-    comments_time = about.resume_analisis()
+    comments_time = about.date_min_max()
     about = ResumeAnalisis(data, 'posts_created')
-    posts_time = about.resume_analisis()
+    posts_time = about.date_min_max()
 
     dataframe = pd.DataFrame()
     dataframe["average"] = df_vader_sentiment["sentiment_score"].mean()
@@ -423,7 +423,7 @@ async def get_comments():
     comments = await getComments(app.db, comments_collection)
     comments = pd.DataFrame(comments)
     about = ResumeAnalisis(comments, 'created_date')
-    message = about.resume_analisis()
+    message = about.date_min_max()
 
     return {"message": message}
 
@@ -515,6 +515,25 @@ async def get_sent_pipeline():
             "count": score
         }
     }
+
+@app.route("/test-datetime", methods=["GET"])
+@cache.cached()
+async def get_datetime():
+    query = request.args.get("name", default="ChatGpt")
+    data = await getDataUnclean(app.db, query)
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    data = data.head(10)
+
+    about = ResumeAnalisis(data, 'comments_created')
+    comments_time = about.date_min_max()
+    about = ResumeAnalisis(data, 'posts_created')
+    posts_time = about.date_min_max()
+
+    return {
+        "comments_dates": comments_time,
+        "posts_dates": posts_time,
+    }
+
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)
