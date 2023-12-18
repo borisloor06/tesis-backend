@@ -456,25 +456,18 @@ async def get_sent_pipeline():
     query = request.args.get("name", default="ChatGpt")
     data = await getDataUnclean(app.db, query)
     data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
-    data = data.head(10)
+    data = data.head(100)
     data = cleanData(data)
     start_time = time.time()
     sentimentAnalizer = SentimentAnalyzer(model_name="cardiffnlp/twitter-roberta-base-sentiment-latest")
     df_sentiment = sentimentAnalizer.getSentiment(data, "comments_body")
     print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
-    mean = df_sentiment.groupby(["label"])["score"].mean().to_dict() 
-    score = df_sentiment["label"].value_counts().to_dict()
-    print(mean)
-    print(df_sentiment["label"].value_counts().to_dict())
-
-    return {
-        "transformer_analysis": {
-            "total_count": df_sentiment["label"].count(),
-            "total_average": df_sentiment[["score"]].mean(),
-            "average": mean,
-            "count": score
-        }
-    }
+    df_join = pd.merge(data, df_sentiment, left_index=True, right_index=True)
+    df_join = df_join.drop(columns=["comments_body", "comments_id", "comments_subreddit_id", "comments_author", "comments_score"], axis=1)
+    df_join['comments_created'] = pd.to_datetime(df_join['comments_created'])
+    df_join.set_index('comments_created', inplace=True)
+    df_by_month = df_join.resample('M').mean()
+    return df_by_month.to_json(orient="records")
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)
