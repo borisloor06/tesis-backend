@@ -4,6 +4,7 @@ import pandas as pd
 from nltk.sentiment import SentimentIntensityAnalyzer
 import nltk
 nltk.download('vader_lexicon')
+import datetime
 
 class TemporalAnalysis:
     def __init__(self, dataframe, time_column, subreddit_column):
@@ -161,13 +162,14 @@ class ResumeAnalisis:
         self.dataframe = dataframe
         self.date_column = date_column
 
-    def resume_analisis(self):
-        self.dataframe[self.date_column] = pd.to_datetime(self.dataframe [self.date_column])
+    def date_min_max(self):
+        # self.dataframe[self.date_column] = pd.to_datetime(self.dataframe[self.date_column])
 
         # Encontrar la fecha mínima y máxima en el DataFrame
         min_date = self.dataframe [self.date_column].min()
         max_date = self.dataframe [self.date_column].max()
 
-        # Imprimir el rango de fechas
-        message = f'Rango de fechas: Desde {min_date} hasta {max_date}'
-        return message
+        min_date = datetime.datetime.utcfromtimestamp(min_date).strftime('%Y-%m-%d %H:%M:%S')
+        max_date = datetime.datetime.utcfromtimestamp(max_date).strftime('%Y-%m-%d %H:%M:%S')
+        #retornar fecha de inicio y fin, como diccionario
+        return {'fecha_inicio': min_date, 'fecha_fin': max_date}
