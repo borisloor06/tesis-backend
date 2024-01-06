@@ -1,6 +1,7 @@
 import pandas as pd
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from src.cleanDataFunctions.cleanData import cleanData
 
 columns_used = [
     "comments_body",
@@ -23,6 +24,56 @@ async def getComments(db, comments_collection_name="reddit_comments"):
     ).batch_size(1000)
     return list(cursor)
 
+
+def getCommentsByDate(db, comments_collection_name="ChatGpt_comments", dateStart="2023-01-01", dateEnd="2023-01-31"):
+    dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
+    dateEndUtc = int(pd.to_datetime(dateEnd, utc=True, dayfirst=True).timestamp())
+    cursor = db[comments_collection_name].find({
+        "created": {
+            "$gte": dateStartUtc,
+            "$lt": dateEndUtc
+        }
+    },
+    {
+        "_id": 0,
+    },
+    ).batch_size(2000)
+    return list(cursor)
+
+def getPostsByDate(db, posts_collection_name="ChatGpt_posts", dateStart="2023-01-01", dateEnd="2023-01-31"):
+    dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
+    dateEndUtc = int(pd.to_datetime(dateEnd, utc=True, dayfirst=True).timestamp())
+    cursor = db[posts_collection_name].find({
+        "created": {
+            "$gte": dateStartUtc,
+            "$lt": dateEndUtc
+        }
+    },
+    {
+        "_id": 0,
+    },
+    ).batch_size(2000)
+    return list(cursor)
+
+def getCommentsAndPostByDateClean(db, comments_collection_name, posts_collection_name, dateStart="2023-01-01", dateEnd="2023-01-31"):
+    comments = getCommentsByDate(db, comments_collection_name, dateStart, dateEnd)
+    comments = pd.DataFrame(comments)
+    comments[['created']] = comments[['created']].astype(object).where(comments[['created']].notnull(), None)
+    posts = getPostsByDate(db, posts_collection_name, dateStart, dateEnd)
+    posts = pd.DataFrame(posts)
+    posts[['created']] = posts[['created']].astype(object).where(posts[['created']].notnull(), None)
+    comments = comments.add_prefix("comments_")
+    posts = posts.add_prefix("posts_")
+    print(posts.head(5))
+    result_df = pd.merge(
+        comments,
+        posts,
+        left_on="comments_subreddit_id",
+        right_on="posts_id",
+        how="inner",
+    )
+    data = cleanData(result_df)
+    return data
 
 async def getPost(db, posts_collection_name="reddit_posts"):
     cursor = db[posts_collection_name].find(
