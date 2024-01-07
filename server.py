@@ -4,17 +4,19 @@ from flask import Flask, request, jsonify
 from flask_caching import Cache
 import pandas as pd
 import requests
+import asyncio
+import threading
 from src.dbConnection.dbConnection import db_client
-from src.saveDbDataFunctions.functions import get_subreddit_posts
+from src.saveDbDataFunctions.functions import get_subreddit_posts, get_subreddit_posts_by_limit
 from src.getDbDataFunctions.getMongoData import (
-    getDataUnclean,
     getAnalisis,
     getComments,
     getCommentsAndPostByDateClean,
     getData,
     getPost,
     getCommentsByDate,
-    getPostsByDate
+    getPostsByDate,
+    getCommentsAndPost
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -79,6 +81,25 @@ async def get_subreddit():
 
     return result_df
 
+@app.route("/subreddit_by_limit", methods=["GET"])
+async def get_subreddit_by_limit():
+    query = request.args.get("name", default="ChatGpt")
+    limit = request.args.get("limit", default=None)
+    time_filter = request.args.get("time_filter", default="day")
+    query_comments_collection = f"{query}_comments"
+    query_posts_collection = f"{query}_posts"
+    # Get the current event loop from the app
+    loop = asyncio.get_event_loop()
+
+    # Run the asynchronous task in the current event loop
+    loop.create_task(
+        get_subreddit_posts_by_limit(
+           app, query, limit, time_filter, query_comments_collection, query_posts_collection
+        )
+    )
+
+    return jsonify({"status": "OK"})
+
 
 # @Param subreddit: Nombre del subreddit a consultar
 # @Param listing: Tipo de listado a consultar (controversial, best, hot, new, random, rising, top)
@@ -120,193 +141,198 @@ def get_results(r):
     df = pd.DataFrame.from_dict(myDict, orient="index")
     return df
 
+async def make_analisis(query):
+    with app.app_context():
+        logging.info("--- start analisis ---")
+        analisis_collection = f"{query}_analisis"
+        try:
+            start_time = time.time()
+            data = await getCommentsAndPost(app.db, query)
+            print("--- %s get data seconds ---" % (time.time() - start_time))
+            logging.info("--- %s get data seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In get data an error occurred: {e}")
+            print(e)
+
+        data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+        try:
+            start_time = time.time()
+            data = cleanData(data)
+            print("--- %s clean seconds ---" % (time.time() - start_time))
+            logging.info("--- %s clean seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In clean data an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            keyword_identifier = KeywordIdentification(data, "posts_title")
+            posts_keywords = keyword_identifier.identify_keywords()
+            print("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In post title keyword analisis an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            keyword_identifier = KeywordIdentification(data, "comments_body")
+            comment_keywords = keyword_identifier.identify_keywords()
+            print("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In comment keyword analisis an error occurred: {e}")
+            print(e)
+        keywords = pd.merge(posts_keywords, comment_keywords, on="keyword", how="outer")
+        keywords["total_counts"] = keywords["keyword_counts_x"].add(keywords["keyword_counts_y"], fill_value=0)
+        keywords = keywords.drop(columns=["keyword_counts_x", "keyword_counts_y"], axis=1)
+        posts_keywords = posts_keywords.set_index('keyword')['keyword_counts'].to_dict()
+        keywords = keywords.sort_values(by="total_counts",ascending=False, ignore_index=True).set_index('keyword')['total_counts'].head(60).to_dict()
+        comment_keywords = comment_keywords.sort_values(by="keyword_counts", ascending=False, ignore_index=True).set_index('keyword')['keyword_counts'].head(60).to_dict()
+
+        try:
+            start_time = time.time()
+            sentiment_analyzer = SentimentAnalyzer()
+            df_emotions = sentiment_analyzer.getSentiment(
+                data, text_column="comments_body"
+            )
+            print("--- %s emotions analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s emotions analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In emotions analisis an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            sentiment_analyzer = SentimentAnalyzer(model_name="cardiffnlp/twitter-roberta-base-sentiment-latest")
+            df_sentiment = sentiment_analyzer.getSentiment(
+                data, text_column="comments_body"
+            )
+            print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In sentiment analisis an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
+            df_author = author_analyzer.analyze_author_patterns()
+            print("--- %s author analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s author analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In author analisis an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            comment_post_relationship_analyzer = CommentPostRelationship(
+                data, "comments_body", "posts_title", "comments_score"
+            )
+            df_relationship = comment_post_relationship_analyzer.analyze_relationships()
+            print("--- %s relaciones comment post analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s relaciones comment post analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In relaciones comment post an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            topic_extractor = TopicExtraction(data, "comments_body")
+            df_topic = topic_extractor.extract_topics()
+            print("--- %s topic analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s topic analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In topic analisis an error occurred: {e}")
+            print(e)
+
+        try:
+            start_time = time.time()
+            sentiment_analyzer = SentimentAnalysis(data, "comments_body")
+            df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
+            print("--- %s varder sentiment analisis seconds ---" % (time.time() - start_time))
+            logging.info("--- %s varder sentiment analisis seconds ---" % (time.time() - start_time))
+        except Exception as e:
+            logging.error(f"In varder sentiment analisis an error occurred: {e}")
+            print(e)
+        
+        about = ResumeAnalisis(data, 'comments_created')
+        comments_time = about.date_min_max()
+        about = ResumeAnalisis(data, 'posts_created')
+        posts_time = about.date_min_max()
+
+        dataframe = pd.DataFrame()
+        dataframe["average"] = df_vader_sentiment["sentiment_score"].mean()
+        dataframe["label"] = dataframe["average"].apply(
+                lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
+            )
+        
+        data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
+        comments_by_month = data.groupby(data['comments_created'].dt.to_period("M")).agg({'comments_id': 'nunique', 'posts_id': 'nunique'}).reset_index()
+        comments_by_month['comments_created'] = comments_by_month['comments_created'].astype(str)
+        comments_by_month = comments_by_month.set_index('comments_created')
+        comments_by_month = comments_by_month.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
+        comments_by_month = comments_by_month.to_dict()
+        
+        data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
+        posts_by_month = data.groupby(data['posts_created'].dt.to_period("M")).agg({'posts_id': 'nunique'}).reset_index()
+        posts_by_month['posts_created'] = posts_by_month['posts_created'].astype(str)
+        posts_by_month = posts_by_month.set_index('posts_created')
+        posts_by_month = posts_by_month.rename(columns={'posts_id': 'posts_count'})
+        posts_by_month = posts_by_month.to_dict()
+
+        result_dict = {
+            "comments_dates": comments_time,
+            "posts_dates": posts_time,
+            "comments_grouped": comments_by_month,
+            "posts_grouped": posts_by_month,
+            "average_comment_post_count": df_relationship["comment_post_count"].mean(),
+            "average_comment_score": data["comments_score"].mean(),
+            "average_author_comment_count": df_author["author_comment_count"].mean(),
+            "total_comments": data["comments_id"].nunique(),
+            "total_posts":  data["posts_id"].nunique(),
+            "total_authors": data["comments_author"].nunique(),
+            "emotion_analysis": {
+                "total_count": float(df_emotions["label"].count()),
+                "total_average": df_emotions["score"].mean(),
+                "average": df_emotions.groupby(["label"])["score"].mean().to_dict(),
+                "count": df_emotions["label"].value_counts().to_dict()
+            },
+            "transformer_analysis": {
+                "total_count": float(df_sentiment["label"].count()),
+                "total_average": df_sentiment["score"].mean(),
+                "average": df_sentiment.groupby(["label"])["score"].mean().to_dict(),
+                "count": df_sentiment["label"].value_counts().to_dict()
+            },
+            "keywords": {
+                "posts": posts_keywords,
+                "comment": comment_keywords,
+                "all": keywords
+            },
+            "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
+            "vader_analysis": {
+                "total_count": float(df_sentiment["label"].count()),
+                "total_average": df_vader_sentiment["sentiment_score"].mean(),
+                "average": df_vader_sentiment.groupby(["sentiment_label"])["sentiment_score"].mean().to_dict(),
+                "count": df_vader_sentiment["sentiment_label"].value_counts().to_dict(),
+            }
+        }
+
+        # Convertir el resultado a un nuevo DataFrame
+        result_dataframe = pd.DataFrame([result_dict])
+
+        saveToDB(result_dataframe, app.db, analisis_collection)
 
 @app.route("/make_analisis", methods=["GET"])
 async def test_get_data():
-    logging.info("--- start analisis ---")
-
     query = request.args.get("name", default="ChatGpt")
-    analisis_collection = f"{query}_analisis"
-    try:
-        start_time = time.time()
-        data = await getDataUnclean(app.db, query)
-        print("--- %s get data seconds ---" % (time.time() - start_time))
-        logging.info("--- %s get data seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In get data an error occurred: {e}")
-        print(e)
+    # Iniciar la tarea en un hilo separado
+    loop = asyncio.get_event_loop()
+    # Run the asynchronous task in the current event loop
+    loop.create_task(make_analisis(query))
 
-    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
-    try:
-        start_time = time.time()
-        data = cleanData(data)
-        print("--- %s clean seconds ---" % (time.time() - start_time))
-        logging.info("--- %s clean seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In clean data an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        keyword_identifier = KeywordIdentification(data, "posts_title")
-        posts_keywords = keyword_identifier.identify_keywords()
-        print("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s post title keyword analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In post title keyword analisis an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        keyword_identifier = KeywordIdentification(data, "comments_body")
-        comment_keywords = keyword_identifier.identify_keywords()
-        print("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s comment keyword analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In comment keyword analisis an error occurred: {e}")
-        print(e)
-    keywords = pd.merge(posts_keywords, comment_keywords, on="keyword", how="outer")
-    keywords["total_counts"] = keywords["keyword_counts_x"].add(keywords["keyword_counts_y"], fill_value=0)
-    keywords = keywords.drop(columns=["keyword_counts_x", "keyword_counts_y"], axis=1)
-    posts_keywords = posts_keywords.set_index('keyword')['keyword_counts'].to_dict()
-    keywords = keywords.sort_values(by="total_counts",ascending=False, ignore_index=True).set_index('keyword')['total_counts'].head(60).to_dict()
-    comment_keywords = comment_keywords.sort_values(by="keyword_counts", ascending=False, ignore_index=True).set_index('keyword')['keyword_counts'].head(60).to_dict()
-
-    try:
-        start_time = time.time()
-        sentiment_analyzer = SentimentAnalyzer()
-        df_emotions = sentiment_analyzer.getSentiment(
-            data, text_column="comments_body"
-        )
-        print("--- %s emotions analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s emotions analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In emotions analisis an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        sentiment_analyzer = SentimentAnalyzer(model_name="cardiffnlp/twitter-roberta-base-sentiment-latest")
-        df_sentiment = sentiment_analyzer.getSentiment(
-            data, text_column="comments_body"
-        )
-        print("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s sentiment analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In sentiment analisis an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
-        df_author = author_analyzer.analyze_author_patterns()
-        print("--- %s author analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s author analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In author analisis an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        comment_post_relationship_analyzer = CommentPostRelationship(
-            data, "comments_body", "posts_title", "comments_score"
-        )
-        df_relationship = comment_post_relationship_analyzer.analyze_relationships()
-        print("--- %s relaciones comment post analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s relaciones comment post analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In relaciones comment post an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        topic_extractor = TopicExtraction(data, "comments_body")
-        df_topic = topic_extractor.extract_topics()
-        print("--- %s topic analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s topic analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In topic analisis an error occurred: {e}")
-        print(e)
-
-    try:
-        start_time = time.time()
-        sentiment_analyzer = SentimentAnalysis(data, "comments_body")
-        df_vader_sentiment = sentiment_analyzer.analyze_sentiments()
-        print("--- %s varder sentiment analisis seconds ---" % (time.time() - start_time))
-        logging.info("--- %s varder sentiment analisis seconds ---" % (time.time() - start_time))
-    except Exception as e:
-        logging.error(f"In varder sentiment analisis an error occurred: {e}")
-        print(e)
-    
-    about = ResumeAnalisis(data, 'comments_created')
-    comments_time = about.date_min_max()
-    about = ResumeAnalisis(data, 'posts_created')
-    posts_time = about.date_min_max()
-
-    dataframe = pd.DataFrame()
-    dataframe["average"] = df_vader_sentiment["sentiment_score"].mean()
-    dataframe["label"] = dataframe["average"].apply(
-            lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
-        )
-    
-    data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
-    comments_by_month = data.groupby(data['comments_created'].dt.to_period("M")).agg({'comments_id': 'nunique', 'posts_id': 'nunique'}).reset_index()
-    comments_by_month['comments_created'] = comments_by_month['comments_created'].astype(str)
-    comments = comments.set_index('comments_created')
-    comments_by_month = comments_by_month.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
-    comments_by_month = comments_by_month.to_dict()
-    
-    data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
-    posts_by_month = data.groupby(data['posts_created'].dt.to_period("M")).agg({'posts_id': 'nunique'}).reset_index()
-    posts_by_month['posts_created'] = posts_by_month['posts_created'].astype(str)
-    posts = posts.set_index('posts_created')
-    posts_by_month = posts_by_month.rename(columns={'posts_id': 'posts_count'})
-    posts_by_month = posts_by_month.to_dict()
-
-    result_dict = {
-        "comments_dates": comments_time,
-        "posts_dates": posts_time,
-        "comments_grouped": comments_by_month,
-        "posts_grouped": posts_by_month,
-        "average_comment_post_count": df_relationship["comment_post_count"].mean(),
-        "average_comment_score": data["comments_score"].mean(),
-        "average_author_comment_count": df_author["author_comment_count"].mean(),
-        "total_comments": data["comments_id"].nunique(),
-        "total_posts":  data["posts_id"].nunique(),
-        "total_authors": data["comments_author"].nunique(),
-        "emotion_analysis": {
-            "total_count": float(df_emotions["label"].count()),
-            "total_average": df_emotions["score"].mean(),
-            "average": df_emotions.groupby(["label"])["score"].mean().to_dict(),
-            "count": df_emotions["label"].value_counts().to_dict()
-        },
-        "transformer_analysis": {
-            "total_count": float(df_sentiment["label"].count()),
-            "total_average": df_sentiment["score"].mean(),
-            "average": df_sentiment.groupby(["label"])["score"].mean().to_dict(),
-            "count": df_sentiment["label"].value_counts().to_dict()
-        },
-        "keywords": {
-            "posts": posts_keywords,
-            "comment": comment_keywords,
-            "all": keywords
-        },
-        "topic_extraction": df_topic["topic_string"].value_counts().to_dict(),
-        "vader_analysis": {
-            "total_count": float(df_sentiment["label"].count()),
-            "total_average": df_vader_sentiment["sentiment_score"].mean(),
-            "average": df_vader_sentiment.groupby(["sentiment_label"])["sentiment_score"].mean().to_dict(),
-            "count": df_vader_sentiment["sentiment_label"].value_counts().to_dict(),
-        }
-    }
-
-    # Convertir el resultado a un nuevo DataFrame
-    result_dataframe = pd.DataFrame([result_dict])
-
-    saveToDB(result_dataframe, app.db, analisis_collection)
-    # # save data to file
-    # data.to_csv("data.csv", index=False, encoding="utf-8")
-    return jsonify({"message": "ok"})
+    # Retornar una respuesta inmediata al cliente
+    return jsonify({"status": "OK"})
 
 
 @app.route("/analisis", methods=["GET"])
@@ -671,14 +697,14 @@ async def get_filter_data():
     data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
     comments_by_month = data.groupby(data['comments_created'].dt.to_period("M")).agg({'comments_id': 'nunique', 'posts_id': 'nunique'}).reset_index()
     comments_by_month['comments_created'] = comments_by_month['comments_created'].astype(str)
-    comments = comments.set_index('comments_created')
+    comments_by_month = comments_by_month.set_index('comments_created')
     comments_by_month = comments_by_month.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
     comments_by_month = comments_by_month.to_dict()
     
     data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
     posts_by_month = data.groupby(data['posts_created'].dt.to_period("M")).agg({'posts_id': 'nunique'}).reset_index()
     posts_by_month['posts_created'] = posts_by_month['posts_created'].astype(str)
-    posts = posts.set_index('posts_created')
+    posts_by_month = posts_by_month.set_index('posts_created')
     posts_by_month = posts_by_month.rename(columns={'posts_id': 'posts_count'})
     posts_by_month = posts_by_month.to_dict()
     
