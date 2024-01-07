@@ -11,7 +11,10 @@ from src.getDbDataFunctions.getMongoData import (
     getAnalisis,
     getComments,
     getCommentsAndPostByDateClean,
-    getData
+    getData,
+    getPost,
+    getCommentsByDate,
+    getPostsByDate
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -749,6 +752,47 @@ async def get_resume_data():
     }
     
     return returned_data
+
+@app.route("/comments_data", methods=["GET"])
+async def get_comments_data():
+    query = request.args.get("name", default="ChatGpt")
+    comments_collection = f"{query}_comments"
+    comments = getComments(app.db, comments_collection)
+    comments = pd.DataFrame(comments)
+    comments = comments.to_json(orient="records")
+    return comments
+
+@app.route("/posts_data", methods=["GET"])
+async def get_posts_data():
+    query = request.args.get("name", default="ChatGpt")
+    posts_collection = f"{query}_posts"
+    posts = getPost(app.db, posts_collection)
+    posts = pd.DataFrame(posts)
+    posts = posts.to_json(orient="records")
+    return posts
+
+@app.route("/comments_filter", methods=["GET"])
+async def get_comments_filter():
+    query = request.args.get("name", default="ChatGpt")
+    dateStart = request.args.get("fecha_inicio", default="01-01-2023")
+    dateEnd = request.args.get("fecha_fin", default="31-01-2023")
+    comments_collection = f"{query}_comments"
+    comments = getCommentsByDate(app.db, comments_collection, dateStart, dateEnd)
+    comments = pd.DataFrame(comments)
+    comments = comments.to_json(orient="records")
+    return comments
+
+@app.route("/posts_filter", methods=["GET"])
+async def get_posts_filter():
+    query = request.args.get("name", default="ChatGpt")
+    dateStart = request.args.get("fecha_inicio", default="01-01-2023")
+    dateEnd = request.args.get("fecha_fin", default="31-01-2023")
+    posts_collection = f"{query}_posts"
+    posts = getPostsByDate(app.db, posts_collection, dateStart, dateEnd)
+    posts = pd.DataFrame(posts)
+    posts = posts.to_json(orient="records")
+    return posts
+
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)

@@ -78,7 +78,7 @@ def getCommentsAndPostByDateClean(db, comments_collection_name, posts_collection
 async def getPost(db, posts_collection_name="reddit_posts"):
     cursor = db[posts_collection_name].find(
         {}, {"_id": 0}
-    ).batch_size(1000)
+    ).batch_size(2000)
     return list(cursor)
 
 
