@@ -88,15 +88,12 @@ async def get_subreddit_by_limit():
     time_filter = request.args.get("time_filter", default="day")
     query_comments_collection = f"{query}_comments"
     query_posts_collection = f"{query}_posts"
-    # Get the current event loop from the app
-    loop = asyncio.get_event_loop()
 
-    # Run the asynchronous task in the current event loop
-    loop.create_task(
-        get_subreddit_posts_by_limit(
-           app, query, limit, time_filter, query_comments_collection, query_posts_collection
-        )
-    )
+    # Espera a que la tarea asíncrona se complete antes de cerrar la sesión
+    thread = threading.Thread(target=asyncio.run, args=(get_subreddit_posts_by_limit(
+        app, query, limit, time_filter, query_comments_collection, query_posts_collection
+    ),))
+    thread.start()
 
     return jsonify({"status": "OK"})
 
@@ -327,10 +324,8 @@ async def make_analisis(query):
 async def test_get_data():
     query = request.args.get("name", default="ChatGpt")
     # Iniciar la tarea en un hilo separado
-    loop = asyncio.get_event_loop()
-    # Run the asynchronous task in the current event loop
-    loop.create_task(make_analisis(query))
-
+    thread = threading.Thread(target=asyncio.run, args=(make_analisis(query),))
+    thread.start()
     # Retornar una respuesta inmediata al cliente
     return jsonify({"status": "OK"})
 
