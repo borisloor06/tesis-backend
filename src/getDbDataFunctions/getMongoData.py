@@ -21,7 +21,7 @@ async def getComments(db, comments_collection_name="reddit_comments"):
         {
             "_id": 0,
         },
-    ).batch_size(1000)
+    ).batch_size(2000)
     return list(cursor)
 
 
@@ -131,4 +131,28 @@ async def getDataUnclean(db, query):
     print("------------------------COMENTARIOS-----------------------------")
     print(comentarios, posts)
     data = await joinPostWithComments(db, comments_collection, posts_collection)
+    return data
+
+async def getData(db, query):
+    comments_collection = f'{query}_comments'
+    posts_collection = f'{query}_posts'
+    comentarios = db[comments_collection].count_documents({})
+    posts = db[posts_collection].count_documents({})
+    print("------------------------COMENTARIOS-----------------------------")
+    print(comentarios, posts)
+    comments = await getComments(db, comments_collection)
+    posts = await getPost(db, posts_collection)
+    comments = pd.DataFrame(comments)
+    posts = pd.DataFrame(posts)
+    comments = comments.add_prefix("comments_")
+    posts = posts.add_prefix("posts_")
+    data = pd.merge(
+        comments,
+        posts,
+        left_on="comments_subreddit_id",
+        right_on="posts_id",
+        how="inner",
+    )
+    data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
+    data = cleanData(data)
     return data

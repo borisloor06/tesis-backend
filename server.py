@@ -11,6 +11,7 @@ from src.getDbDataFunctions.getMongoData import (
     getAnalisis,
     getComments,
     getCommentsAndPostByDateClean,
+    getData
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -244,10 +245,26 @@ async def test_get_data():
     dataframe["label"] = dataframe["average"].apply(
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
+    
+    data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
+    comments_by_month = data.groupby(data['comments_created'].dt.to_period("M")).agg({'comments_id': 'nunique', 'posts_id': 'nunique'}).reset_index()
+    comments_by_month['comments_created'] = comments_by_month['comments_created'].astype(str)
+    comments = comments.set_index('comments_created')
+    comments_by_month = comments_by_month.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
+    comments_by_month = comments_by_month.to_dict()
+    
+    data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
+    posts_by_month = data.groupby(data['posts_created'].dt.to_period("M")).agg({'posts_id': 'nunique'}).reset_index()
+    posts_by_month['posts_created'] = posts_by_month['posts_created'].astype(str)
+    posts = posts.set_index('posts_created')
+    posts_by_month = posts_by_month.rename(columns={'posts_id': 'posts_count'})
+    posts_by_month = posts_by_month.to_dict()
 
     result_dict = {
         "comments_dates": comments_time,
         "posts_dates": posts_time,
+        "comments_grouped": comments_by_month,
+        "posts_grouped": posts_by_month,
         "average_comment_post_count": df_relationship["comment_post_count"].mean(),
         "average_comment_score": data["comments_score"].mean(),
         "average_author_comment_count": df_author["author_comment_count"].mean(),
@@ -647,10 +664,27 @@ async def get_filter_data():
     dataframe["label"] = dataframe["average"].apply(
             lambda score: "positive" if score > 0 else ("neutral" if score == 0 else "negative")
         )
+    
+    data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
+    comments_by_month = data.groupby(data['comments_created'].dt.to_period("M")).agg({'comments_id': 'nunique', 'posts_id': 'nunique'}).reset_index()
+    comments_by_month['comments_created'] = comments_by_month['comments_created'].astype(str)
+    comments = comments.set_index('comments_created')
+    comments_by_month = comments_by_month.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
+    comments_by_month = comments_by_month.to_dict()
+    
+    data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
+    posts_by_month = data.groupby(data['posts_created'].dt.to_period("M")).agg({'posts_id': 'nunique'}).reset_index()
+    posts_by_month['posts_created'] = posts_by_month['posts_created'].astype(str)
+    posts = posts.set_index('posts_created')
+    posts_by_month = posts_by_month.rename(columns={'posts_id': 'posts_count'})
+    posts_by_month = posts_by_month.to_dict()
+    
 
     result_dict = {
         "comments_dates": comments_time,
         "posts_dates": posts_time,
+        "comments_grouped": comments_by_month,
+        "posts_grouped": posts_by_month,
         "average_comment_post_count": df_relationship["comment_post_count"].mean(),
         "average_comment_score": data["comments_score"].mean(),
         "average_author_comment_count": df_author["author_comment_count"].mean(),
@@ -687,6 +721,34 @@ async def get_filter_data():
     result_dataframe = pd.DataFrame([result_dict])
     return result_dataframe.to_json(orient="records")
 
+@app.route("/resume_data", methods=["GET"])
+async def get_resume_data():
+    query = request.args.get("name", default="ChatGpt")
+    data = await getData(app.db, query)
+    
+    # Convertir el valor numérico directamente a un objeto de fecha y hora en UTC
+    data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
+    
+    comments = data.groupby(data['comments_created'].dt.to_period("M")).agg({'comments_id': 'nunique', 'posts_id': 'nunique'}).reset_index()
+    comments['comments_created'] = comments['comments_created'].astype(str)
+    comments = comments.set_index('comments_created')
+    comments = comments.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
+    comments = comments.to_dict(orient='records')
+    
+    data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
+    
+    posts = data.groupby(data['posts_created'].dt.to_period("M")).agg({'posts_id': 'nunique'}).reset_index()
+    posts['posts_created'] = posts['posts_created'].astype(str)
+    posts = posts.set_index('posts_created')
+    posts = posts.rename(columns={'posts_id': 'posts_count'})
+
+    returned_data = {
+        'comments': comments,
+        'posts': posts.to_dict(orient='records'),
+        'posts_dict': posts.to_dict(),
+    }
+    
+    return returned_data
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)
