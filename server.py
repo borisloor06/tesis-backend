@@ -784,7 +784,7 @@ async def get_comments_data():
     comments_collection = f"{query}_comments"
     total = app.db[comments_collection].count_documents({})
     comments = getCommentsByLimit(app.db, comments_collection, limit, offset)
-    return jsonify({"total": total, "comments": comments})
+    return {"total": total, "comments": comments}
             
 
 @app.route("/posts_data", methods=["GET"])
@@ -795,7 +795,7 @@ async def get_posts_data():
     limit = int(request.args.get("limit", default=10))
     posts = getPostsByLimit(app.db, posts_collection, limit, offset)
     total = app.db[posts_collection].count_documents({})
-    return jsonify({"total": total, "posts": posts})
+    return {"total": total, "posts": posts}
 
 @app.route("/comments_filter", methods=["GET"])
 async def get_comments_filter():
