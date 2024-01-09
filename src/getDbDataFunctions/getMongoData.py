@@ -39,7 +39,7 @@ def getCommentsByLimit(db, comments_collection_name="reddit_comments", limit=100
 def updateDate(db, comments_collection_name="reddit_comments", posts_collection_name="reddit_posts"):
     comments = db[comments_collection_name].find({}, {"_id": 0}).batch_size(2000)
     for comment in comments:
-        created_date = datetime.datetime.utcfromtimestamp(comment.created).strftime('%Y-%m-%d %H:%M:%S')
+        created_date = datetime.datetime.utcfromtimestamp(comment["created"]).strftime('%Y-%m-%d %H:%M:%S')
 
         print(comment["created_utc"])
         db[comments_collection_name].update_one(
@@ -48,7 +48,7 @@ def updateDate(db, comments_collection_name="reddit_comments", posts_collection_
         )
     posts = db[posts_collection_name].find({}, {"_id": 0}).batch_size(2000)
     for post in posts:
-        created_date = datetime.datetime.utcfromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S')
+        created_date = datetime.datetime.utcfromtimestamp(post["created"]).strftime('%Y-%m-%d %H:%M:%S')
         db[posts_collection_name].update_one(
             {"id": post["id"]},
             {"$set": {"created_date": created_date}},
