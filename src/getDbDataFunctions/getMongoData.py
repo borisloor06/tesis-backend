@@ -13,7 +13,7 @@ columns_used = [
 ]
 
 
-async def getComments(db, comments_collection_name="reddit_comments"):
+def getComments(db, comments_collection_name="reddit_comments"):
     cursor = db[comments_collection_name].find(
         {},
         {
@@ -22,6 +22,32 @@ async def getComments(db, comments_collection_name="reddit_comments"):
     ).batch_size(2000)
     return list(cursor)
 
+def getCommentsByLimit(db, comments_collection_name="reddit_comments", limit=1000, offset=0):
+    limit = int(limit)
+    offset = int(offset)
+    print(limit, offset)
+    cursor = db[comments_collection_name].find(
+        {},
+        {
+            "_id": 0,
+        },
+    ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
+
+    return list(cursor)
+
+
+def getPostsByLimit(db, posts_collection_name="reddit_posts", limit=1000, offset=0):
+    limit = int(limit)
+    offset = int(offset)
+    print(limit, offset)
+    cursor = db[posts_collection_name].find(
+        {},
+        {
+            "_id": 0,
+        },
+    ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
+
+    return list(cursor)
 
 def getCommentsByDate(db, comments_collection_name="ChatGpt_comments", dateStart="2023-01-01", dateEnd="2023-01-31"):
     dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
@@ -73,26 +99,34 @@ def getCommentsAndPostByDateClean(db, comments_collection_name, posts_collection
     data = cleanData(result_df)
     return data
 
-async def getPost(db, posts_collection_name="reddit_posts"):
+def getPost(db, posts_collection_name="reddit_posts"):
     cursor = db[posts_collection_name].find(
         {}, {"_id": 0}
     ).batch_size(2000)
     return list(cursor)
 
 
-async def getAnalisis(db, posts_collection_name="ChatGpt_analisis"):
+def getAnalisis(db, posts_collection_name="ChatGpt_analisis"):
     cursor = db[posts_collection_name].find({}, {"_id": 0}).batch_size(2000)
     return list(cursor)
 
-async def getData(db, query):
+def updateAnalisis(db, posts_collection_name="ChatGpt_analisis", data={}):
+    db[posts_collection_name].find_one_and_update(
+        {},
+        {"$set": data},
+    )
+    return True
+
+
+def getData(db, query):
     comments_collection = f'{query}_comments'
     posts_collection = f'{query}_posts'
     comentarios = db[comments_collection].count_documents({})
     posts = db[posts_collection].count_documents({})
     print("------------------------COMENTARIOS-----------------------------")
     print(comentarios, posts)
-    comments = await getComments(db, comments_collection)
-    posts = await getPost(db, posts_collection)
+    comments = getComments(db, comments_collection)
+    posts = getPost(db, posts_collection)
     comments = pd.DataFrame(comments)
     posts = pd.DataFrame(posts)
     comments = comments.add_prefix("comments_")
@@ -108,11 +142,11 @@ async def getData(db, query):
     data = cleanData(data)
     return data
 
-async def getCommentsAndPost(db, query):
+def getCommentsAndPost(db, query):
     comments_collection = f'{query}_comments'
     posts_collection = f'{query}_posts'
-    comments = await getComments(db, comments_collection)
-    posts = await getPost(db, posts_collection)
+    comments = getComments(db, comments_collection)
+    posts = getPost(db, posts_collection)
     comments = pd.DataFrame(comments)
     posts = pd.DataFrame(posts)
     comments = comments.add_prefix("comments_")

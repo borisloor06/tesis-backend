@@ -13,10 +13,12 @@ from src.getDbDataFunctions.getMongoData import (
     getComments,
     getCommentsAndPostByDateClean,
     getData,
-    getPost,
+    getPostsByLimit,
     getCommentsByDate,
     getPostsByDate,
-    getCommentsAndPost
+    getCommentsAndPost,
+    getCommentsByLimit,
+    updateAnalisis
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -63,7 +65,7 @@ async def get_subreddit():
     query = request.args.get("name", default="ChatGpt")
     query_comments_collection = f"{query}_comments"
     query_posts_collection = f"{query}_posts"
-    posts_df, comments_df = await get_subreddit_posts(
+    posts_df, comments_df = get_subreddit_posts(
         app, query, start_date_str, query_comments_collection, query_posts_collection
     )
 
@@ -144,7 +146,7 @@ async def make_analisis(query):
         analisis_collection = f"{query}_analisis"
         try:
             start_time = time.time()
-            data = await getCommentsAndPost(app.db, query)
+            data = getCommentsAndPost(app.db, query)
             print("--- %s get data seconds ---" % (time.time() - start_time))
             logging.info("--- %s get data seconds ---" % (time.time() - start_time))
         except Exception as e:
@@ -337,7 +339,7 @@ async def get_analisis_data():
     analisis_collection = f"{query}_analisis"
 
     start_time = time.time()
-    analisis = await getAnalisis(app.db, analisis_collection)
+    analisis = getAnalisis(app.db, analisis_collection)
     print("--- %s get analisis seconds ---" % (time.time() - start_time))
     print("-------------------analisis-------------------")
     analisis = pd.DataFrame(analisis)
@@ -351,7 +353,7 @@ async def get_analisis_data():
 async def get_analisis_sentimientos():
     query = request.args.get("name", default="ChatGpt")
     start_time = time.time()
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     print("--- %s get data seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
@@ -370,7 +372,7 @@ async def get_analisis_sentimientos():
 @cache.cached()
 async def get_author_analisis():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
 
     data = cleanData(data)
     author_analyzer = AuthorAnalysis(data, "comments_author", "comments_body")
@@ -383,7 +385,7 @@ async def get_author_analisis():
 @cache.cached()
 async def get_temporal_analisis():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = cleanData(data)
     temporal_analyzer = TemporalAnalysis(data, "posts_created", "comments_subreddit")
     df_time = temporal_analyzer.analyze_temporal_patterns()
@@ -395,7 +397,7 @@ async def get_temporal_analisis():
 @cache.cached()
 async def get_comment_post_relationship_analisis():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = cleanData(data)
     comment_post_relationship_analyzer = CommentPostRelationship(
         data, "comments_body", "posts_title", "comments_score"
@@ -409,7 +411,7 @@ async def get_comment_post_relationship_analisis():
 @cache.cached()
 async def get_keyword_identification():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = cleanData(data)
     keyword_identifier = KeywordIdentification(data, "comments_body")
     df_keyword = keyword_identifier.identify_keywords()
@@ -421,7 +423,7 @@ async def get_keyword_identification():
 @cache.cached()
 async def get_topic_extraction():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = cleanData(data)
     topic_extractor = TopicExtraction(data, "comments_body")
     df_topic = topic_extractor.extract_topics()
@@ -462,7 +464,7 @@ async def agregar_data():
 async def get_comments():
     query = request.args.get("name", default="ChatGpt")
     comments_collection = f"{query}_comments"
-    comments = await getComments(app.db, comments_collection)
+    comments = getComments(app.db, comments_collection)
     comments = pd.DataFrame(comments)
     about = ResumeAnalisis(comments, 'created_date')
     message = about.date_min_max()
@@ -473,7 +475,7 @@ async def get_comments():
 @cache.cached()
 async def get_keywords():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
     data = cleanData(data)
     keyword_identifier = KeywordIdentification(data, "comments_body")
@@ -498,7 +500,7 @@ async def get_keywords():
 @cache.cached()
 async def get_keywords2():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
     data = cleanData(data)
     keyword_identifier = KeywordTfidfIdentification(data, "comments_body")
@@ -523,7 +525,7 @@ async def get_keywords2():
 @cache.cached()
 async def get_tp():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
     data = cleanData(data)
     start_time = time.time()
@@ -536,7 +538,7 @@ async def get_tp():
 @cache.cached()
 async def get_sent_pipeline():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
     data = data.head(100)
     data = cleanData(data)
@@ -562,7 +564,7 @@ async def get_sent_pipeline():
 @cache.cached()
 async def get_datetime():
     query = request.args.get("name", default="ChatGpt")
-    data = await getCommentsAndPost(app.db, query)
+    data = getCommentsAndPost(app.db, query)
     data = data.drop(columns=["comments_created_date", "posts_created_date"], axis=1)
     data = data.head(10)
 
@@ -748,7 +750,7 @@ async def get_filter_data():
 @app.route("/resume_data", methods=["GET"])
 async def get_resume_data():
     query = request.args.get("name", default="ChatGpt")
-    data = await getData(app.db, query)
+    data = getData(app.db, query)
     
     # Convertir el valor numérico directamente a un objeto de fecha y hora en UTC
     data['comments_created'] = pd.to_datetime(data['comments_created'], unit='s', origin='unix', utc=True)
@@ -757,7 +759,6 @@ async def get_resume_data():
     comments['comments_created'] = comments['comments_created'].astype(str)
     comments = comments.set_index('comments_created')
     comments = comments.rename(columns={'comments_id': 'comments_count', 'posts_id': 'posts_count'})
-    comments = comments.to_dict(orient='records')
     
     data['posts_created'] = pd.to_datetime(data['posts_created'], unit='s', origin='unix', utc=True)
     
@@ -767,30 +768,34 @@ async def get_resume_data():
     posts = posts.rename(columns={'posts_id': 'posts_count'})
 
     returned_data = {
-        'comments': comments,
-        'posts': posts.to_dict(orient='records'),
-        'posts_dict': posts.to_dict(),
+        'comments_grouped': comments.to_dict(),
+        'posts_grouped': posts.to_dict(),
     }
+    analisis_collection = f"{query}_analisis"
+    updateAnalisis(app.db, analisis_collection, returned_data)
     
     return returned_data
 
 @app.route("/comments_data", methods=["GET"])
 async def get_comments_data():
     query = request.args.get("name", default="ChatGpt")
+    offset = int(request.args.get("offset", default=0))
+    limit = int(request.args.get("limit", default=10))
     comments_collection = f"{query}_comments"
-    comments = await getComments(app.db, comments_collection)
-    comments = pd.DataFrame(comments)
-    comments = comments.to_json(orient="records")
-    return comments
+    total = app.db[comments_collection].count_documents({})
+    comments = getCommentsByLimit(app.db, comments_collection, limit, offset)
+    return jsonify({"total": total, "comments": comments})
+            
 
 @app.route("/posts_data", methods=["GET"])
 async def get_posts_data():
     query = request.args.get("name", default="ChatGpt")
     posts_collection = f"{query}_posts"
-    posts = await getPost(app.db, posts_collection)
-    posts = pd.DataFrame(posts)
-    posts = posts.to_json(orient="records")
-    return posts
+    offset = int(request.args.get("offset", default=0))
+    limit = int(request.args.get("limit", default=10))
+    posts = getPostsByLimit(app.db, posts_collection, limit, offset)
+    total = app.db[posts_collection].count_documents({})
+    return jsonify({"total": total, "posts": posts})
 
 @app.route("/comments_filter", methods=["GET"])
 async def get_comments_filter():
