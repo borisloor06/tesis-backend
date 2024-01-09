@@ -41,7 +41,6 @@ def updateDate(db, comments_collection_name="reddit_comments", posts_collection_
     for comment in comments:
         created_date = datetime.datetime.utcfromtimestamp(comment["created"]).strftime('%Y-%m-%d %H:%M:%S')
 
-        print(comment["created_utc"])
         db[comments_collection_name].update_one(
             {"id": comment["id"]},
             {"$set": {"created_date": created_date}},
