@@ -18,7 +18,8 @@ from src.getDbDataFunctions.getMongoData import (
     getPostsByDate,
     getCommentsAndPost,
     getCommentsByLimit,
-    updateAnalisis
+    updateAnalisis,
+    updateDate
 )
 from src.cleanDataFunctions.cleanData import cleanData
 from src.nlpAnalizeFunctions.modelBERT import SentimentAnalyzer
@@ -784,7 +785,7 @@ async def get_comments_data():
     comments_collection = f"{query}_comments"
     total = app.db[comments_collection].count_documents({})
     comments = getCommentsByLimit(app.db, comments_collection, limit, offset)
-    return {"total": total, "comments": comments}
+    return jsonify({"total": total, "comments": comments})
             
 
 @app.route("/posts_data", methods=["GET"])
@@ -795,7 +796,7 @@ async def get_posts_data():
     limit = int(request.args.get("limit", default=10))
     posts = getPostsByLimit(app.db, posts_collection, limit, offset)
     total = app.db[posts_collection].count_documents({})
-    return {"total": total, "posts": posts}
+    return jsonify({"total": total, "posts": posts})
 
 @app.route("/comments_filter", methods=["GET"])
 async def get_comments_filter():
@@ -818,6 +819,14 @@ async def get_posts_filter():
     posts = pd.DataFrame(posts)
     posts = posts.to_json(orient="records")
     return posts
+
+@app.route("/update_date", methods=["GET"])
+async def update_created_date():
+    query = request.args.get("name", default="ChatGpt")
+    comments_collection = f"{query}_comments"
+    posts_collection = f"{query}_posts"
+    updateDate(app.db, comments_collection, posts_collection)
+    return {"message": "ok"}
 
 
 def run_gevent_server():

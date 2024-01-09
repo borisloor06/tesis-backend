@@ -1,5 +1,6 @@
 import pandas as pd
 from src.cleanDataFunctions.cleanData import cleanData
+import datetime
 
 columns_used = [
     "comments_body",
@@ -35,6 +36,25 @@ def getCommentsByLimit(db, comments_collection_name="reddit_comments", limit=100
 
     return list(cursor)
 
+def updateDate(db, comments_collection_name="reddit_comments", posts_collection_name="reddit_posts"):
+    comments = db[comments_collection_name].find({}, {"_id": 0}).batch_size(2000)
+    for comment in comments:
+        created_date = datetime.datetime.utcfromtimestamp(comment.created).strftime('%Y-%m-%d %H:%M:%S')
+
+        print(comment["created_utc"])
+        db[comments_collection_name].update_one(
+            {"id": comment["id"]},
+            {"$set": {"created_date": created_date}},
+        )
+    posts = db[posts_collection_name].find({}, {"_id": 0}).batch_size(2000)
+    for post in posts:
+        created_date = datetime.datetime.utcfromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S')
+        db[posts_collection_name].update_one(
+            {"id": post["id"]},
+            {"$set": {"created_date": created_date}},
+        )
+
+    return True
 
 def getPostsByLimit(db, posts_collection_name="reddit_posts", limit=1000, offset=0):
     limit = int(limit)
