@@ -34,6 +34,7 @@ from src.nlpAnalizeFunctions.textFunctions import (
     ResumeAnalisis,
     KeywordTfidfIdentification
 )
+from src.getDbDataFunctions.settingsData import getConfig, createConfig
 import time
 from flask_cors import CORS
 import logging
@@ -828,6 +829,23 @@ async def update_created_date():
     updateDate(app.db, comments_collection, posts_collection)
     return {"message": "ok"}
 
+# rutas para obtener y crear configuraciones, con la estructura devEnv, urlDev, urlProd
+@app.route("/config", methods=["GET"])
+async def get_config():
+    try:
+        config = getConfig(app.db)
+        return config
+    except Exception as e:
+        return {"message": "error"}
+
+@app.route("/config", methods=["POST"])
+async def create_config():
+    data = request.json
+    try:
+        createConfig(app.db, data)
+        return {"message": "ok"}
+    except Exception as e:
+        return {"message": "error"}
 
 def run_gevent_server():
     http_server = WSGIServer(("127.0.0.1", 8000), app)

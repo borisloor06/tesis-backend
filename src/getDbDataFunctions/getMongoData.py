@@ -63,6 +63,7 @@ def getPostsByLimit(db, posts_collection_name="reddit_posts", limit=1000, offset
         {},
         {
             "_id": 0,
+            "created_date": 0
         },
     ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
 
