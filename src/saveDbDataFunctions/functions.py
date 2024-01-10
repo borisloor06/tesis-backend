@@ -52,7 +52,7 @@ async def fetch_posts_data(post, posts_collection_name, db):
     return post_see
 
 async def get_subreddit_posts(app, subreddit_name, comments_collection_name='reddit_comments', posts_collection_name='reddit_posts'):
-    
+
     session = ClientSession(trust_env=True)
     reddit = asyncpraw.Reddit(requestor_kwargs={"session": session})
     db = app.db

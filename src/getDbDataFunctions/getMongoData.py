@@ -31,6 +31,7 @@ def getCommentsByLimit(db, comments_collection_name="reddit_comments", limit=100
         {},
         {
             "_id": 0,
+            "created_date": 0
         },
     ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
 
@@ -69,7 +70,7 @@ def getPostsByLimit(db, posts_collection_name="reddit_posts", limit=1000, offset
 
     return list(cursor)
 
-def getCommentsByDate(db, comments_collection_name="ChatGpt_comments", dateStart="2023-01-01", dateEnd="2023-01-31"):
+def getCommentsByDate(db, comments_collection_name="ChatGpt_comments", dateStart="2023-01-01", dateEnd="2023-01-31", limit=1000, offset=0):
     dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
     dateEndUtc = int(pd.to_datetime(dateEnd, utc=True, dayfirst=True).timestamp())
     cursor = db[comments_collection_name].find({
@@ -81,10 +82,10 @@ def getCommentsByDate(db, comments_collection_name="ChatGpt_comments", dateStart
     {
         "_id": 0,
     },
-    ).batch_size(2000)
+    ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
     return list(cursor)
 
-def getPostsByDate(db, posts_collection_name="ChatGpt_posts", dateStart="2023-01-01", dateEnd="2023-01-31"):
+def getPostsByDate(db, posts_collection_name="ChatGpt_posts", dateStart="2023-01-01", dateEnd="2023-01-31", limit=1000, offset=0):
     dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
     dateEndUtc = int(pd.to_datetime(dateEnd, utc=True, dayfirst=True).timestamp())
     cursor = db[posts_collection_name].find({
@@ -96,7 +97,7 @@ def getPostsByDate(db, posts_collection_name="ChatGpt_posts", dateStart="2023-01
     {
         "_id": 0,
     },
-    ).batch_size(2000)
+    ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
     return list(cursor)
 
 def getCommentsAndPostByDateClean(db, comments_collection_name, posts_collection_name, dateStart="2023-01-01", dateEnd="2023-01-31"):

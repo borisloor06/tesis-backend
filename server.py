@@ -804,22 +804,38 @@ async def get_comments_filter():
     query = request.args.get("name", default="ChatGpt")
     dateStart = request.args.get("fecha_inicio", default="01-01-2023")
     dateEnd = request.args.get("fecha_fin", default="31-01-2023")
+    offset = int(request.args.get("offset", default=0))
+    limit = int(request.args.get("limit", default=10))
     comments_collection = f"{query}_comments"
-    comments = getCommentsByDate(app.db, comments_collection, dateStart, dateEnd)
-    comments = pd.DataFrame(comments)
-    comments = comments.to_json(orient="records")
-    return comments
+    comments = getCommentsByDate(app.db, comments_collection, dateStart, dateEnd, limit, offset)
+    dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
+    dateEndUtc = int(pd.to_datetime(dateEnd, utc=True, dayfirst=True).timestamp())
+
+    total = app.db[comments_collection].count_documents({
+        "created": {
+            "$gte": dateStartUtc,
+            "$lt": dateEndUtc
+        }
+    })
+    return jsonify({"total": total, "comments": comments})
 
 @app.route("/posts_filter", methods=["GET"])
 async def get_posts_filter():
     query = request.args.get("name", default="ChatGpt")
     dateStart = request.args.get("fecha_inicio", default="01-01-2023")
     dateEnd = request.args.get("fecha_fin", default="31-01-2023")
+    offset = int(request.args.get("offset", default=0))
+    limit = int(request.args.get("limit", default=10))
     posts_collection = f"{query}_posts"
-    posts = getPostsByDate(app.db, posts_collection, dateStart, dateEnd)
-    posts = pd.DataFrame(posts)
-    posts = posts.to_json(orient="records")
-    return posts
+    posts = getPostsByDate(app.db, posts_collection, dateStart, dateEnd, limit, offset)
+    dateStartUtc = int(pd.to_datetime(dateStart, utc=True, dayfirst=True).timestamp())
+    dateEndUtc = int(pd.to_datetime(dateEnd, utc=True, dayfirst=True).timestamp())
+
+    total = app.db[posts_collection].count_documents({"created": {
+            "$gte": dateStartUtc,
+            "$lt": dateEndUtc
+        }})
+    return jsonify({"total": total, "posts": posts})
 
 @app.route("/update_date", methods=["GET"])
 async def update_created_date():
