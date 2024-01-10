@@ -81,6 +81,7 @@ def getCommentsByDate(db, comments_collection_name="ChatGpt_comments", dateStart
     },
     {
         "_id": 0,
+        "created_date": 0
     },
     ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
     return list(cursor)
@@ -96,6 +97,7 @@ def getPostsByDate(db, posts_collection_name="ChatGpt_posts", dateStart="2023-01
     },
     {
         "_id": 0,
+        "created_date": 0
     },
     ).limit(limit).skip(offset).sort([("_id", -1)]).batch_size(2000)
     return list(cursor)
