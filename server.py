@@ -808,8 +808,8 @@ async def get_comments_filter():
     limit = int(request.args.get("limit", default=10))
     comments_collection = f"{query}_comments"
     comments = getCommentsByDate(app.db, comments_collection, dateStart, dateEnd, limit, offset)
-    dateStartUtc = int(pd.to_datetime(dateStart, format='%Y-%m-%d', utc=True, dayfirst=True).timestamp())
-    dateEndUtc = int(pd.to_datetime(dateEnd, format='%Y-%m-%d', utc=True, dayfirst=True).timestamp())
+    dateStartUtc = int(pd.to_datetime(dateStart, format='%Y-%m-%d', utc=True).timestamp())
+    dateEndUtc = int(pd.to_datetime(dateEnd, format='%Y-%m-%d', utc=True).timestamp())
 
     total = app.db[comments_collection].count_documents({
         "created": {
@@ -828,8 +828,8 @@ async def get_posts_filter():
     limit = int(request.args.get("limit", default=10))
     posts_collection = f"{query}_posts"
     posts = getPostsByDate(app.db, posts_collection, dateStart, dateEnd, limit, offset)
-    dateStartUtc = int(pd.to_datetime(dateStart, format='%Y-%m-%d', utc=True, dayfirst=True).timestamp())
-    dateEndUtc = int(pd.to_datetime(dateEnd, format='%Y-%m-%d', utc=True, dayfirst=True).timestamp())
+    dateStartUtc = int(pd.to_datetime(dateStart, format='%Y-%m-%d', utc=True).timestamp())
+    dateEndUtc = int(pd.to_datetime(dateEnd, format='%Y-%m-%d', utc=True).timestamp())
 
     total = app.db[posts_collection].count_documents({"created": {
             "$gte": dateStartUtc,
